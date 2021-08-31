@@ -42,15 +42,16 @@ namespace JSON2IFC
 			string output_path = Path.Combine(di.FullName, "models");
 			if (!Directory.Exists(output_path))
 				Directory.CreateDirectory(output_path);
-			GenerateIFC(TypeIFC.Structure, XbimSchemaVersion.Ifc4, output_path);
-		}
-		internal enum TypeIFC { Structure, MEP };
+			GenerateIFC(TypeIFC.Model, XbimSchemaVersion.Ifc4, output_path);
+        }
+		internal enum TypeIFC { Structure, MEP, Model};
         internal static class TypicalMaterial
         {
             public static string Concrete { get { return "Concrete"; } }
             public static string Glass { get { return "Glass"; } }
             public static string Wood { get { return "Wood"; } }
             public static string Air { get { return "Air"; } }
+            public static string PVC { get { return "PVC"; } }
         }
         internal const double UNIT_CONVERSION = 1000;
         internal const double WINDOW_WIDTH = 0.05;
@@ -67,18 +68,30 @@ namespace JSON2IFC
 			jsonStructure jo = JsonConvert.DeserializeObject<jsonStructure>(jsonText);
 			return jo;
 		}
-		static void GenerateIFC(TypeIFC type, XbimSchemaVersion release, string path)
+        static jsonMEP readJSONMEP()
+        {
+            string strReadFilePath = @".\Data\pipe.json";
+            StreamReader srReadFile = new StreamReader(strReadFilePath);
+            string jsonText = "";
+            while (!srReadFile.EndOfStream)
+            {
+                jsonText += srReadFile.ReadLine();
+            }
+            jsonMEP jo = JsonConvert.DeserializeObject<jsonMEP>(jsonText);
+            return jo;
+        }
+        static void GenerateIFC(TypeIFC type, XbimSchemaVersion release, string path)
 		{
             using (var ifcStore = createandInitModel("Model"))
             {
-                if(ifcStore != null)
+                if (ifcStore != null)
                 {
                     IfcBuilding ifcBuilding = createBuilding(ifcStore, "Building");
                     IfcBuildingStorey ifcBuildingStorey = createStorey(ifcBuilding);
-                    if (type == TypeIFC.Structure)
+                    if (type == TypeIFC.Structure || type == TypeIFC.Model)
                     {
                         jsonStructure js = readJSONStructure();
-                        List<IfcExtrudedAreaSolid> ifcColumnsRepresentations = new List<IfcExtrudedAreaSolid>();
+                        List<IfcExtrudedAreaSolid> ifcColumnRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcBeamRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcWallRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcWindowRepresentations = new List<IfcExtrudedAreaSolid>();
@@ -99,19 +112,39 @@ namespace JSON2IFC
                                         material.Name = TypicalMaterial.Concrete;
                                     });
                                 });
-                                //show material
-                                IfcPresentationLayerAssignment ifcPresentationLayerAssignment = ifcStore.Instances.New<IfcPresentationLayerAssignment>(presentationLayerAssignment =>
-                                {
-                                    presentationLayerAssignment.Name = "Presentation Layer Assignment";
-                                });
                                 foreach (jsonColumn jsonColumn in js.Column)
                                 {
                                     double length = jsonColumn.length * 1000;
                                     double width = jsonColumn.width * 1000;
-                                    double height = jsonColumn.Height * 1000;
+                                    double height = jsonColumn.height * 1000;
                                     jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.RotationalAngleInRadius) * 1000;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.LocationPoint.X, jsonColumn.LocationPoint.Y, jsonColumn.LocationPoint.Z) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    //showcase appearance
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                    {
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                        {
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                            {
+                                                surfaceStyle.Name = "Concrete, Column";
+                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                {
+                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                    {
+                                                        colorRGB.Red = 0.250980;
+                                                        colorRGB.Green = 0.250980;
+                                                        colorRGB.Blue = 0.250980;
+                                                    });
+                                                    surfaceStyleRendering.Transparency = 0;
+                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                }));
+                                            }));
+                                        }));
+                                    });
                                     IfcColumn ifcColumn = ifcStore.Instances.New<IfcColumn>(column =>
                                     {
                                         column.Name = "";
@@ -154,9 +187,9 @@ namespace JSON2IFC
                                                             direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
                                                         });
                                                     });
-                                                    ifcColumnsRepresentations.Add(extrudedAreaSolid);
+                                                    ifcColumnRepresentations.Add(extrudedAreaSolid);
+                                                    ifcStyledItem.Item = extrudedAreaSolid;
                                                 }));
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
                                             }));
                                         });
                                         column.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -242,7 +275,7 @@ namespace JSON2IFC
                                                         ifcBeamRepresentations.Add(extrudedAreaSolid);
                                                     });
                                                 });
-                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnsRepresentations)
+                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
                                                     ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
@@ -274,7 +307,7 @@ namespace JSON2IFC
                                         double width = jsonWindow.width * 1000;
                                         double height = jsonWindow.height * 1000;
 
-                                        jsonXYZ refDirJsonXYZ = (jsonWindow.EndPoint - jsonWindow.StartPoint) * 1000;
+                                        jsonXYZ refDirJsonXYZ = (jsonWindow.endPoint - jsonWindow.startPoint) * 1000;
                                         jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.X, jsonWindow.location.Y, jsonWindow.location.Z) * 1000;
                                         jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                         //axis: extrude dir/Z dir; refDirection: width dir/X dir
@@ -316,11 +349,11 @@ namespace JSON2IFC
                                     }
                                     foreach (jsonDoor jsonDoor in js.Door)
                                     {
-                                        double length = jsonDoor.length * 1000;
-                                        double width = jsonDoor.width * 1000;
-                                        double height = jsonDoor.height * 1000;
+                                        double length = jsonDoor.length * UNIT_CONVERSION;
+                                        double width = jsonDoor.width * UNIT_CONVERSION;
+                                        double height = jsonDoor.height * UNIT_CONVERSION;
 
-                                        jsonXYZ refDirJsonXYZ = (jsonDoor.EndPoint - jsonDoor.StartPoint) * 1000;
+                                        jsonXYZ refDirJsonXYZ = (jsonDoor.endPoint - jsonDoor.startPoint) * 1000;
                                         jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.X, jsonDoor.location.Y, jsonDoor.location.Z) * 1000;
                                         jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                         //axis: extrude dir/Z dir; refDirection: width dir/X dir
@@ -368,6 +401,218 @@ namespace JSON2IFC
                             //create walls
                             if (js.Wall != null)
                             {
+                                //create Wall-Ext_102Bwk-75Ins-100LBlk-12P
+                                IfcWallType ifcWallType = ifcStore.Instances.New<IfcWallType>(wallType => 
+                                {
+                                    wallType.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P";
+                                    wallType.HasPropertySets.AddRange(new IfcPropertySet[] 
+                                    {
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                        {
+                                            propertySet.Name = "Analytical Properties";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue => 
+                                                {
+                                                    singleValue.Name = "Absorptance";
+                                                    singleValue.NominalValue = new IfcReal(0.7);
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Heat Transfer Coefficient (U)";
+                                                    singleValue.NominalValue = new IfcReal(0.235926059936681);
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Roughness";
+                                                    singleValue.NominalValue = new IfcInteger(3);
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Thermal mass";
+                                                    singleValue.NominalValue = new IfcReal(300303.0);
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Thermal Resistance (R)";
+                                                    singleValue.NominalValue = new IfcReal(4.23861611671209);
+                                                })
+                                            });
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
+                                        {
+                                            propertySet.Name = "Construction";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Function";
+                                                    singleValue.NominalValue = new IfcIdentifier("Exterior");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Width";
+                                                    singleValue.NominalValue = new IfcLengthMeasure(290.0);//Testing Value
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Wrapping at Ends";
+                                                    singleValue.NominalValue = new IfcIdentifier("None");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Wrapping at Inserts";
+                                                    singleValue.NominalValue = new IfcIdentifier("Both");
+                                                })
+                                            });
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
+                                        {
+                                            propertySet.Name = "Graphics";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Coarse Scale Fill Color";
+                                                    singleValue.NominalValue = new IfcInteger("12632256");//Testing Value
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Coarse Scale Fill Pattern";
+                                                    singleValue.NominalValue = new IfcLabel("Solid fill");
+                                                })
+                                            });
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
+                                        {
+                                            propertySet.Name = "Identity Data";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Assembly Code";
+                                                    singleValue.NominalValue = new IfcText("");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Assembly Description";
+                                                    singleValue.NominalValue = new IfcText("");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Keynote";
+                                                    singleValue.NominalValue = new IfcText("31120");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Type Name";
+                                                    singleValue.NominalValue = new IfcText("Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                                })
+                                            });
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
+                                        {
+                                            propertySet.Name = "Materials and Finishes";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Structural Material";
+                                                    singleValue.NominalValue = new IfcLabel("Concrete Masonry Units _Low Density");
+                                                })
+                                            });
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
+                                        {
+                                            propertySet.Name = "Other";
+                                            propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
+                                            {
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Category";
+                                                    singleValue.NominalValue = new IfcLabel("Walls");
+                                                }),
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                                {
+                                                    singleValue.Name = "Family Name";
+                                                    singleValue.NominalValue = new IfcText("Basic Wall");
+                                                })
+                                            });
+                                        })
+                                    });
+                                    wallType.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
+                                    wallType.Tag = "654321";
+
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = ifcWallType;
+                                });
+                                //create standard properties for wall entities
+                                IfcPropertySet otherPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                {
+                                    propertySet.Name = "Other";
+                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[] 
+                                    {
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue => 
+                                        {
+                                            singleValue.Name = "Category";
+                                            singleValue.NominalValue = new IfcLabel("Walls");
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "Family";
+                                            singleValue.NominalValue = new IfcLabel("Basic Wall: Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "Family and Type";
+                                            singleValue.NominalValue = new IfcLabel("Basic Wall: Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "Type";
+                                            singleValue.NominalValue = new IfcLabel("Basic Wall: Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "Type Id";
+                                            singleValue.NominalValue = new IfcLabel("Basic Wall: Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                        })
+                                    });
+                                });
+                                IfcPropertySet PsetPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                {
+                                    propertySet.Name = "Pset_WallCommon";
+                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[] 
+                                    {
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "Reference";
+                                            singleValue.NominalValue = new IfcIdentifier("Wall-Ext_102Bwk-75Ins-100LBlk-12P");
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "LoadBearing";
+                                            singleValue.NominalValue = new IfcBoolean(false);
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "ExtendToStructure";
+                                            singleValue.NominalValue = new IfcBoolean(true);
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "IsExternal";
+                                            singleValue.NominalValue = new IfcBoolean(true);
+                                        }),
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                        {
+                                            singleValue.Name = "ThermalTransmittance";
+                                            singleValue.NominalValue = new IfcThermalTransmittanceMeasure(0.235926059936681);
+                                        })
+                                    });
+                                });
                                 foreach (jsonWall jsonWall in js.Wall)
                                 {
                                     //create material
@@ -378,21 +623,41 @@ namespace JSON2IFC
                                             material.Name = TypicalMaterial.Concrete;
                                         });
                                     });
-                                    //show material
-                                    IfcPresentationLayerAssignment ifcPresentationLayerAssignment = ifcStore.Instances.New<IfcPresentationLayerAssignment>(presentationLayerAssignment =>
+                                    //showcase appearance
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem => 
                                     {
-                                        presentationLayerAssignment.Name = "Presentation Layer Assignment";
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment => 
+                                        {
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle => 
+                                            {
+                                                surfaceStyle.Name = "Wall, Common";
+                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering => 
+                                                {
+                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                    {
+                                                        colorRGB.Red = 0.666666666666667;
+                                                        colorRGB.Green = 0.392156862745098;
+                                                        colorRGB.Blue = 0.411764705882353;
+                                                    });
+                                                    surfaceStyleRendering.Transparency = 0;
+                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                }));
+                                            }));
+                                        }));
                                     });
                                     double length = jsonWall.length * UNIT_CONVERSION;
                                     double width = jsonWall.width * UNIT_CONVERSION;
                                     double height = jsonWall.height * UNIT_CONVERSION;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.EndPoint - jsonWall.StartPoint).X, (jsonWall.EndPoint - jsonWall.StartPoint).Y, (jsonWall.EndPoint - jsonWall.StartPoint).Z) * UNIT_CONVERSION;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).X, (jsonWall.endPoint - jsonWall.startPoint).Y, (jsonWall.endPoint - jsonWall.startPoint).Z) * UNIT_CONVERSION;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.X, jsonWall.location.Y, jsonWall.location.Z) * UNIT_CONVERSION;
 
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     IfcWall ifcWall = ifcStore.Instances.New<IfcWall>(wall =>
                                     {
-                                        wall.Name = "";
+                                        wall.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:" + jsonWall.ID.ToString();
                                         wall.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                         {
                                             productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
@@ -438,7 +703,7 @@ namespace JSON2IFC
                                                         ifcWallRepresentations.Add(extrudedAreaSolid);
                                                     });
                                                 });
-                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnsRepresentations)
+                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
                                                     ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
@@ -475,12 +740,26 @@ namespace JSON2IFC
                                                     });
                                                 }
                                                 shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
+                                                ifcStyledItem.Item = ifcBooleanResult;
                                             }));
                                         });
                                         wall.ObjectPlacement = ifcBuilding.ObjectPlacement;
+                                        wall.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
+                                        wall.Tag = jsonWall.ID.ToString();
+                                        wall.ObjectType = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:654321";
                                     });
+                                    ifcRelDefinesByType.RelatedObjects.Add(ifcWall);
                                     ifcRelAssociatesMaterial.RelatedObjects.Add(ifcWall);
+                                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties => 
+                                    {
+                                        relDefinesByProperties.RelatedObjects.Add(ifcWall);
+                                        relDefinesByProperties.RelatingPropertyDefinition = otherPropertySet;
+                                    });
+                                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                                    {
+                                        relDefinesByProperties.RelatedObjects.Add(ifcWall);
+                                        relDefinesByProperties.RelatingPropertyDefinition = PsetPropertySet;
+                                    });
                                     ifcProducts.Add(ifcWall);
                                 }
                             }
@@ -515,21 +794,43 @@ namespace JSON2IFC
                                         material.Name = TypicalMaterial.Glass;
                                     });
                                 });
-                                //show material
-                                IfcPresentationLayerAssignment ifcPresentationLayerAssignment = ifcStore.Instances.New<IfcPresentationLayerAssignment>(presentationLayerAssignment =>
-                                {
-                                    presentationLayerAssignment.Name = "Presentation Layer Assignment";
-                                });
+                                //create properties
+
                                 foreach (jsonWindow jsonWindow in js.Window)
                                 {
                                     double length = jsonWindow.length * 1000;
                                     double width = WINDOW_WIDTH * 1000;
                                     double height = jsonWindow.height * 1000;
 
-                                    jsonXYZ refDirJsonXYZ = (jsonWindow.EndPoint - jsonWindow.StartPoint) * 1000;
+                                    jsonXYZ refDirJsonXYZ = (jsonWindow.endPoint - jsonWindow.startPoint) * 1000;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.X, jsonWindow.location.Y, jsonWindow.location.Z) * 1000;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    //showcase appearance
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                    {
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                        {
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                            {
+                                                surfaceStyle.Name = "Glass, Column";
+                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                {
+                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                    {
+                                                        colorRGB.Red = 0.137255;
+                                                        colorRGB.Green = 0.403922;
+                                                        colorRGB.Blue = 0.870588;
+                                                    });
+                                                    surfaceStyleRendering.Transparency = 0.4;
+                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                }));
+                                            }));
+                                        }));
+                                    });
 
                                     IfcExtrudedAreaSolid ifcExtrudedAreaSolid = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                     {
@@ -563,7 +864,6 @@ namespace JSON2IFC
                                                 direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
                                             });
                                         });
-                                        ifcWindowRepresentations.Add(extrudedAreaSolid);
                                     });
 
                                     IfcWindow ifcWindow = ifcStore.Instances.New<IfcWindow>(window =>
@@ -580,7 +880,7 @@ namespace JSON2IFC
                                                     initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
                                                     initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcExtrudedAreaSolid;
                                                 });
-                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnsRepresentations)
+                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
                                                     ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
@@ -599,7 +899,7 @@ namespace JSON2IFC
                                                     });
                                                 }
                                                 shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
+                                                ifcStyledItem.Item = ifcBooleanResult;
                                             }));
                                         });
                                         window.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -634,21 +934,42 @@ namespace JSON2IFC
                                         material.Name = TypicalMaterial.Wood;
                                     });
                                 });
-                                //show material
-                                IfcPresentationLayerAssignment ifcPresentationLayerAssignment = ifcStore.Instances.New<IfcPresentationLayerAssignment>(presentationLayerAssignment =>
-                                {
-                                    presentationLayerAssignment.Name = "Presentation Layer Assignment";
-                                });
+
                                 foreach (jsonDoor jsonDoor in js.Door)
                                 {
                                     double length = jsonDoor.length * 1000;
                                     double width = DOOR_WIDTH * 1000;
                                     double height = jsonDoor.height * 1000;
 
-                                    jsonXYZ refDirJsonXYZ = (jsonDoor.EndPoint - jsonDoor.StartPoint) * 1000;
+                                    jsonXYZ refDirJsonXYZ = (jsonDoor.endPoint - jsonDoor.startPoint) * 1000;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.X, jsonDoor.location.Y, jsonDoor.location.Z) * 1000;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    //showcase appearance
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                    {
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                        {
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                            {
+                                                surfaceStyle.Name = "Wood, Common";
+                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                {
+                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                    {
+                                                        colorRGB.Red = 0.637255;
+                                                        colorRGB.Green = 0.603922;
+                                                        colorRGB.Blue = 0.670588;
+                                                    });
+                                                    surfaceStyleRendering.Transparency = 0;
+                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                }));
+                                            }));
+                                        }));
+                                    });
 
                                     IfcExtrudedAreaSolid ifcExtrudedAreaSolid = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                     {
@@ -682,7 +1003,6 @@ namespace JSON2IFC
                                                 direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
                                             });
                                         });
-                                        ifcDoorRepresentations.Add(extrudedAreaSolid);
                                     });
 
                                     IfcDoor ifcDoor = ifcStore.Instances.New<IfcDoor>(door =>
@@ -699,7 +1019,7 @@ namespace JSON2IFC
                                                     initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
                                                     initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcExtrudedAreaSolid;
                                                 });
-                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnsRepresentations)
+                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
                                                     ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
@@ -718,7 +1038,7 @@ namespace JSON2IFC
                                                     });
                                                 }
                                                 shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
+                                                ifcStyledItem.Item = ifcBooleanResult;
                                             }));
                                         });
                                         door.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -775,10 +1095,10 @@ namespace JSON2IFC
                                 });
                                 foreach(jsonSlab jsonSlab in js.Slab)
                                 {
-                                    double thickness = jsonSlab.thickness * 1000;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0) * 1000;
-                                    jsonXYZ locationJsonXYZ = jsonSlab.location * 1000;
-                                    jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
+                                    double thickness = jsonSlab.thickness * UNIT_CONVERSION;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0) * UNIT_CONVERSION;
+                                    jsonXYZ locationJsonXYZ = jsonSlab.location * UNIT_CONVERSION;
+                                    jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
 
                                     IfcSlab ifcSlab1 = ifcStore.Instances.New<IfcSlab>(slab =>
@@ -800,11 +1120,11 @@ namespace JSON2IFC
                                                         arbitraryClosedProfileDef.OuterCurve = ifcStore.Instances.New<IfcPolyline>(polyline =>
                                                         {
                                                             List<IfcCartesianPoint> points = new List<IfcCartesianPoint>();
-                                                            foreach (jsonXYZ jsonXYZ in jsonSlab.BaseProfile)
+                                                            foreach (jsonXYZ jsonXYZ in jsonSlab.baseProfile)
                                                             {
                                                                 points.Add(ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                                 {
-                                                                    cartesianPoint.SetXYZ(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION, jsonXYZ.Z * UNIT_CONVERSION);
+                                                                    cartesianPoint.SetXY(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION);
                                                                 }));
                                                             }
                                                             polyline.Points.AddRange(points);
@@ -817,7 +1137,7 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z + js.Wall[0].height * 1000);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
@@ -863,11 +1183,11 @@ namespace JSON2IFC
                                                         arbitraryClosedProfileDef.OuterCurve = ifcStore.Instances.New<IfcPolyline>(polyline =>
                                                         {
                                                             List<IfcCartesianPoint> points = new List<IfcCartesianPoint>();
-                                                            foreach (jsonXYZ jsonXYZ in jsonSlab.BaseProfile)
+                                                            foreach (jsonXYZ jsonXYZ in jsonSlab.baseProfile)
                                                             {
                                                                 points.Add(ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                                 {
-                                                                    cartesianPoint.SetXYZ(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION, jsonXYZ.Z * UNIT_CONVERSION);
+                                                                    cartesianPoint.SetXY(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION);
                                                                 }));
                                                             }
                                                             polyline.Points.AddRange(points);
@@ -880,7 +1200,7 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z + (js.Wall[0].height + jsonSlab.thickness * 2) * UNIT_CONVERSION);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
@@ -919,11 +1239,127 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
-                        ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString() + ".ifc"), StorageType.Ifc);
+                        if(type == TypeIFC.Structure) ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString() + ".ifc"), StorageType.Ifc);
                     }
-                    else
+                    if (type == TypeIFC.MEP || type == TypeIFC.Model)
                     {
+                        jsonMEP jmep = readJSONMEP();
+                        List<IfcExtrudedAreaSolid> ifcPipeRepresentations = new List<IfcExtrudedAreaSolid>();
+                        List<IfcExtrudedAreaSolid> ifcEllbowRepresentations = new List<IfcExtrudedAreaSolid>();
+                        List<IfcExtrudedAreaSolid> ifcTFittingRepresentations = new List<IfcExtrudedAreaSolid>();
 
+                        List<IfcProduct> ifcProducts = new List<IfcProduct>();
+                        using (var txn = ifcStore.BeginTransaction("Create Columns"))
+                        {
+                            //create pipes
+                            if (jmep.pipe != null)
+                            {
+                                //create material
+                                IfcRelAssociatesMaterial ifcRelAssociatesMaterial = ifcStore.Instances.New<IfcRelAssociatesMaterial>(relAssociatesMaterial =>
+                                {
+                                    relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material =>
+                                    {
+                                        material.Name = TypicalMaterial.PVC;
+                                    });
+                                });
+                                foreach (jsonPipe jsonPipe in jmep.pipe)
+                                {
+                                    double length = jsonPipe.length * 1000;
+                                    double radius = jsonPipe.Radius * 1000;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.X, jsonPipe.Startpoint.Y, jsonPipe.Startpoint.Z) * 1000;
+                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).X, (jsonPipe.Endpoint - jsonPipe.Startpoint).Y, (jsonPipe.Endpoint - jsonPipe.Startpoint).Z) * 1000;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * 1000;
+                                    //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    //showcase appearance
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                    {
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                        {
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                            {
+                                                surfaceStyle.Name = "PVC, common";
+                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                {
+                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                    {
+                                                        colorRGB.Red = 0.1;
+                                                        colorRGB.Green = 0.1;
+                                                        colorRGB.Blue = 0.1;
+                                                    });
+                                                    surfaceStyleRendering.Transparency = 0;
+                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                }));
+                                            }));
+                                        }));
+                                    });
+                                    IIfcFlowSegment ifcFlowSegment = new Create(ifcStore).FlowSegment(flowSegment =>
+                                    {
+                                        flowSegment.Name = "";
+                                        flowSegment.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
+                                        {
+                                            productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
+                                            {
+                                                shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
+                                                shapeRepresentation.RepresentationType = "SweptSolid";
+                                                shapeRepresentation.RepresentationIdentifier = "Body";
+                                                shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
+                                                {
+                                                    extrudedAreaSolid.Depth = length;
+                                                    extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcCircleProfileDef>(circleProfileDef =>
+                                                    {
+                                                        circleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                        circleProfileDef.ProfileName = "";
+                                                        circleProfileDef.Radius = radius;
+                                                        circleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                        {
+                                                            axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                            {
+                                                                cartesianPoint.SetXY(0, 0);
+                                                            });
+                                                        });
+                                                    });
+                                                    extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                    extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                    {
+                                                        axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                        {
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                        });
+                                                        axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                        });
+                                                        axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                        });
+                                                    });
+                                                    ifcPipeRepresentations.Add(extrudedAreaSolid);
+                                                    ifcStyledItem.Item = extrudedAreaSolid;
+                                                }));
+                                            }));
+                                        });
+                                        flowSegment.ObjectPlacement = ifcBuilding.ObjectPlacement;
+                                    });
+                                    ifcRelAssociatesMaterial.RelatedObjects.Add(ifcFlowSegment);
+                                    ifcProducts.Add((IfcProduct)ifcFlowSegment);
+                                }
+                            }
+                            txn.Commit();
+                        }
+                        using (var txn = ifcStore.BeginTransaction(""))
+                        {
+                            ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
+                            foreach (IfcProduct ifcProduct in ifcProducts)
+                            {
+                                ifcBuildingStorey.AddElement(ifcProduct);
+                            }
+                            txn.Commit();
+                        }
+                        ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString().ToUpper() + ".ifc"), StorageType.Ifc);
                     }
 
                 }
@@ -935,7 +1371,7 @@ namespace JSON2IFC
             {
                 ApplicationDevelopersName = "SJ-NTU Corporate Lab",
                 ApplicationFullName = "JSON to IFC",
-                ApplicationIdentifier = "IFCConversion.exe",
+                ApplicationIdentifier = "JSON2IFC.exe",
                 ApplicationVersion = "1.0",
                 EditorsFamilyName = "SJ-NTU Corporate Lab Team",
                 EditorsGivenName = "SJ-NTU Corporate Lab",
@@ -992,6 +1428,7 @@ namespace JSON2IFC
             }
             return storey;
         }
+        //Structure
         public class jsonStructure
         {
             public jsonBeam[] Beam { get; set; }
@@ -1006,50 +1443,51 @@ namespace JSON2IFC
         }
         public class jsonWindow
         {
-            public jsonXYZ EndPoint { get; set; }
-            public double HeightOfBottomFace { get; set; }
-            public jsonXYZ StartPoint { get; set; }
+            public jsonXYZ endPoint { get; set; }
+            public double heightOfBottomFace { get; set; }
+            public jsonXYZ startPoint { get; set; }
             public double height { get; set; }
             public double width { get; set; }
             public int ID { get; set; }
             public jsonXYZ location
             {
-                get { return (this.StartPoint + this.EndPoint) / 2 + new jsonXYZ(0, 0, this.HeightOfBottomFace); }
+                get { return (this.startPoint + this.endPoint) / 2 + new jsonXYZ(0, 0, this.heightOfBottomFace); }
                 set { }
             }
             public double length
             {
-                get { return this.StartPoint.distanceTo(this.EndPoint); }
+                get { return this.startPoint.distanceTo(this.endPoint); }
                 set { }
             }
         }
         public class jsonFloor
         {
-            public jsonXYZ[] BaseProfile { get; set; }
+            public jsonXYZ[] baseProfile { get; set; }
             public double thickness { get; set; }
             public int ID { get; set; }
         }
         public class jsonSlab
         {
-            public jsonXYZ[] BaseProfile { get; set; }
+            public jsonXYZ[] baseProfile { get; set; }
             public double thickness { get; set; }
+            public double bottom { get; set; }
             public int ID { get; set; }
-            public jsonXYZ location => new jsonXYZ(0, 0, 0);
+            public jsonXYZ location => new jsonXYZ(0, 0, bottom);
         }
         public class jsonCeiling
         {
-            public jsonXYZ[] BaseProfile { get; set; }
+            public jsonXYZ[] baseProfile { get; set; }
             public double thickness { get; set; }
             public int ID { get; set; }
         }
         public class jsonBeam
         {
-            public jsonXYZ[] BaseProfile { get; set; }
-            public double HeightOfBottomFace { get; set; }
+            public jsonXYZ[] baseProfile { get; set; }
+            public double heightOfBottomFace { get; set; }
             public double thickness { get; set; }
             public double width
             {
-                get { return Math.Min(this.BaseProfile[0].distanceTo(this.BaseProfile[1]), this.BaseProfile[0].distanceTo(this.BaseProfile[3])); }
+                get { return Math.Min(this.baseProfile[0].distanceTo(this.baseProfile[1]), this.baseProfile[0].distanceTo(this.baseProfile[3])); }
                 set { }
             }
             public int ID { get; set; }
@@ -1057,13 +1495,13 @@ namespace JSON2IFC
             {
                 get
                 {
-                    return (this.BaseProfile[1].distanceTo(this.BaseProfile[0]) == this.width ? (this.BaseProfile[0] + this.BaseProfile[1]) / 2 : (this.BaseProfile[1] + this.BaseProfile[2]) / 2) + new jsonXYZ(0, 0, this.HeightOfBottomFace + this.thickness / 2);
+                    return (this.baseProfile[1].distanceTo(this.baseProfile[0]) == this.width ? (this.baseProfile[0] + this.baseProfile[1]) / 2 : (this.baseProfile[1] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.thickness / 2);
                 }
                 set { }
             }
             public jsonXYZ endPoint
             {
-                get { return (this.BaseProfile[3].distanceTo(this.BaseProfile[0]) == this.width ? (this.BaseProfile[0] + this.BaseProfile[3]) / 2 : (this.BaseProfile[3] + this.BaseProfile[2]) / 2) + new jsonXYZ(0, 0, this.HeightOfBottomFace + this.thickness / 2); }
+                get { return (this.baseProfile[3].distanceTo(this.baseProfile[0]) == this.width ? (this.baseProfile[0] + this.baseProfile[3]) / 2 : (this.baseProfile[3] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.thickness / 2); }
                 set { }
             }
             public double length { get { return this.startPoint.distanceTo(this.endPoint); } set { } }
@@ -1071,7 +1509,7 @@ namespace JSON2IFC
         }
         public class jsonColumn
         {
-            public double Height { get; set; }
+            public double height { get; set; }
             public jsonXYZ LocationPoint { get; set; }
             public double RotationalAngleInRadius { get; set; }
             public double length { get; set; }
@@ -1080,26 +1518,26 @@ namespace JSON2IFC
         }
         public class jsonDoor
         {
-            public jsonXYZ EndPoint { get; set; }
-            public jsonXYZ StartPoint { get; set; }
+            public jsonXYZ endPoint { get; set; }
+            public jsonXYZ startPoint { get; set; }
             public double height { get; set; }
             public double width { get; set; }
             public int ID { get; set; }
             public jsonXYZ location
             {
-                get { return (this.StartPoint + this.EndPoint) / 2; }
+                get { return (this.startPoint + this.endPoint) / 2; }
                 set { }
             }
             public double length
             {
-                get { return this.StartPoint.distanceTo(this.EndPoint); }
+                get { return this.startPoint.distanceTo(this.endPoint); }
                 set { }
             }
         }
         public class jsonWall
         {
-            public jsonXYZ EndPoint { get; set; }
-            public jsonXYZ StartPoint { get; set; }
+            public jsonXYZ endPoint { get; set; }
+            public jsonXYZ startPoint { get; set; }
             public double height { get; set; }
             public double width { get; set; }
             public int ID { get; set; }
@@ -1107,10 +1545,10 @@ namespace JSON2IFC
             public jsonHole[] HoleList { get; set; }
             public jsonXYZ location
             {
-                get { return (this.StartPoint + this.EndPoint) / 2; }
+                get { return (this.startPoint + this.endPoint) / 2; }
                 set { }
             }
-            public double length { get; set; }
+            public double length { get { return this.startPoint.distanceTo(this.endPoint); } set { } }
 
         }
         public class WallConnection
@@ -1229,6 +1667,31 @@ namespace JSON2IFC
                 return new_pt;
             }
         }
-        //123
+        //MEP
+        public class jsonMEP
+        {
+            public jsonPipe[] pipe { get; set; }
+            public jsonFitting[] Elbow_Pipe_Junction { get; set; }
+            public jsonTee[] T_Pipe_Junction { get; set; }
+        }
+        public class jsonPipe
+        {
+            public int ID { get; set; }
+            public double Radius { get; set; }
+            public jsonXYZ Startpoint { get; set; }
+            public jsonXYZ Endpoint { get; set; }
+            public double length { get { return this.Startpoint.distanceTo(this.Endpoint); } set { } }
+        }
+        public class jsonFitting
+        {
+            public int Pipe_Index_1 { get; set; }
+            public int Pipe_Index_2 { get; set; }
+        }
+        public class jsonTee
+        {
+            public int Pipe_Index_1 { get; set; }
+            public int Pipe_Index_2 { get; set; }
+            public int Pipe_Index_3 { get; set; }
+        }
     }
 }
