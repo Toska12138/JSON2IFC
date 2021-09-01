@@ -97,7 +97,7 @@ namespace JSON2IFC
                         List<IfcExtrudedAreaSolid> ifcWindowRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcDoorRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcSlabRepresentations = new List<IfcExtrudedAreaSolid>();
-
+                        
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
                         using (var txn = ifcStore.BeginTransaction("Create Columns"))
                         {
@@ -1088,11 +1088,6 @@ namespace JSON2IFC
                                         material.Name = TypicalMaterial.Concrete;
                                     });
                                 });
-                                //show material
-                                IfcPresentationLayerAssignment ifcPresentationLayerAssignment = ifcStore.Instances.New<IfcPresentationLayerAssignment>(presentationLayerAssignment =>
-                                {
-                                    presentationLayerAssignment.Name = "Presentation Layer Assignment";
-                                });
                                 foreach(jsonSlab jsonSlab in js.Slab)
                                 {
                                     double thickness = jsonSlab.thickness * UNIT_CONVERSION;
@@ -1100,9 +1095,33 @@ namespace JSON2IFC
                                     jsonXYZ locationJsonXYZ = jsonSlab.location * UNIT_CONVERSION;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
-
+                                    //showcase appearance
                                     IfcSlab ifcSlab1 = ifcStore.Instances.New<IfcSlab>(slab =>
                                     {
+                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                        {
+                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                            {
+                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                {
+                                                    surfaceStyle.Name = "Glass, Column";
+                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                    {
+                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                        {
+                                                            colorRGB.Red = 0.837255;
+                                                            colorRGB.Green = 0.603922;
+                                                            colorRGB.Blue = 0.670588;
+                                                        });
+                                                        surfaceStyleRendering.Transparency = 0.4;
+                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                    }));
+                                                }));
+                                            }));
+                                        });
                                         slab.Name = "";
                                         slab.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                         {
@@ -1149,8 +1168,8 @@ namespace JSON2IFC
                                                         });
                                                     });
                                                     ifcSlabRepresentations.Add(extrudedAreaSolid);
+                                                    ifcStyledItem.Item = extrudedAreaSolid;
                                                 }));
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
                                             }));
                                         });
                                         slab.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -1166,6 +1185,30 @@ namespace JSON2IFC
 
                                     IfcSlab ifcSlab2 = ifcStore.Instances.New<IfcSlab>(slab =>
                                     {
+                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                        {
+                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                            {
+                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                {
+                                                    surfaceStyle.Name = "Glass, Column";
+                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                    {
+                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                        {
+                                                            colorRGB.Red = 0.837255;
+                                                            colorRGB.Green = 0.603922;
+                                                            colorRGB.Blue = 0.670588;
+                                                        });
+                                                        surfaceStyleRendering.Transparency = 0.4;
+                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                    }));
+                                                }));
+                                            }));
+                                        });
                                         slab.Name = "";
                                         slab.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                         {
@@ -1212,8 +1255,8 @@ namespace JSON2IFC
                                                         });
                                                     });
                                                     ifcSlabRepresentations.Add(extrudedAreaSolid);
+                                                    ifcStyledItem.Item = extrudedAreaSolid;
                                                 }));
-                                                ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
                                             }));
                                         });
                                         slab.ObjectPlacement = ifcBuilding.ObjectPlacement;
