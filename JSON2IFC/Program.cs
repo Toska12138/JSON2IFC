@@ -1,19 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
-
 using Newtonsoft.Json;
-
 using Xbim.Common;
 using Xbim.Common.Step21;
 using Xbim.Ifc;
-using Xbim.IO;
-using Xbim.Ifc4.ActorResource;
-using Xbim.Ifc4.DateTimeResource;
-using Xbim.Ifc4.ExternalReferenceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.GeometricConstraintResource;
 using Xbim.Ifc4.GeometricModelResource;
 using Xbim.Ifc4.GeometryResource;
@@ -21,30 +15,31 @@ using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
 using Xbim.Ifc4.MaterialResource;
 using Xbim.Ifc4.MeasureResource;
+using Xbim.Ifc4.PresentationAppearanceResource;
+using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.PropertyResource;
-using Xbim.Ifc4.QuantityResource;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.PresentationAppearanceResource;
+using Xbim.IO;
 
 
 namespace JSON2IFC
 {
     public class Program
-	{
-		static void Main(string[] args)
-		{
-			DirectoryInfo di = Directory.GetParent(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
-			di = Directory.GetParent(di.FullName);
+    {
+        static void Main(string[] args)
+        {
+            DirectoryInfo di = Directory.GetParent(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+            di = Directory.GetParent(di.FullName);
 
-			string output_path = Path.Combine(di.FullName, "models");
-			if (!Directory.Exists(output_path))
-				Directory.CreateDirectory(output_path);
-			GenerateIFC(TypeIFC.Model, XbimSchemaVersion.Ifc4, output_path);
+            string output_path = Path.Combine(di.FullName, "models");
+            if (!Directory.Exists(output_path))
+                Directory.CreateDirectory(output_path);
+            GenerateIFC(TypeIFC.Model, XbimSchemaVersion.Ifc4, output_path);
         }
-		internal enum TypeIFC { Structure, MEP, Model};
+        internal enum TypeIFC { Structure, MEP, Model };
         internal static class TypicalMaterial
         {
             public static string Concrete { get { return "Concrete"; } }
@@ -56,18 +51,19 @@ namespace JSON2IFC
         internal const double UNIT_CONVERSION = 1000;
         internal const double WINDOW_WIDTH = 0.05;
         internal const double DOOR_WIDTH = 0.07;
+        internal const double FITTING_RADIUS_RATIO = 2;
         static jsonStructure readJSONStructure()
-		{
-			string strReadFilePath = @".\Data\recon.json";
-			StreamReader srReadFile = new StreamReader(strReadFilePath);
-			string jsonText = "";
-			while (!srReadFile.EndOfStream)
-			{
-				jsonText += srReadFile.ReadLine();
-			}
-			jsonStructure jo = JsonConvert.DeserializeObject<jsonStructure>(jsonText);
-			return jo;
-		}
+        {
+            string strReadFilePath = @".\Data\recon.json";
+            StreamReader srReadFile = new StreamReader(strReadFilePath);
+            string jsonText = "";
+            while (!srReadFile.EndOfStream)
+            {
+                jsonText += srReadFile.ReadLine();
+            }
+            jsonStructure jo = JsonConvert.DeserializeObject<jsonStructure>(jsonText);
+            return jo;
+        }
         static jsonMEP readJSONMEP()
         {
             string strReadFilePath = @".\Data\pipe.json";
@@ -81,7 +77,8 @@ namespace JSON2IFC
             return jo;
         }
         static void GenerateIFC(TypeIFC type, XbimSchemaVersion release, string path)
-		{
+        {
+            string error_msg = "";
             using (var ifcStore = createandInitModel("Model"))
             {
                 if (ifcStore != null)
@@ -97,7 +94,7 @@ namespace JSON2IFC
                         List<IfcExtrudedAreaSolid> ifcWindowRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcDoorRepresentations = new List<IfcExtrudedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcSlabRepresentations = new List<IfcExtrudedAreaSolid>();
-                        
+
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
                         using (var txn = ifcStore.BeginTransaction("Create Columns"))
                         {
@@ -402,17 +399,17 @@ namespace JSON2IFC
                             if (js.Wall != null)
                             {
                                 //create Wall-Ext_102Bwk-75Ins-100LBlk-12P
-                                IfcWallType ifcWallType = ifcStore.Instances.New<IfcWallType>(wallType => 
+                                IfcWallType ifcWallType = ifcStore.Instances.New<IfcWallType>(wallType =>
                                 {
                                     wallType.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P";
-                                    wallType.HasPropertySets.AddRange(new IfcPropertySet[] 
+                                    wallType.HasPropertySets.AddRange(new IfcPropertySet[]
                                     {
-                                        ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                        ifcStore.Instances.New<IfcPropertySet>(propertySet =>
                                         {
                                             propertySet.Name = "Analytical Properties";
                                             propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
                                             {
-                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue => 
+                                                ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                                                 {
                                                     singleValue.Name = "Absorptance";
                                                     singleValue.NominalValue = new IfcReal(0.7);
@@ -549,12 +546,12 @@ namespace JSON2IFC
                                     relDefinesByType.RelatingType = ifcWallType;
                                 });
                                 //create standard properties for wall entities
-                                IfcPropertySet otherPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                IfcPropertySet otherPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet =>
                                 {
                                     propertySet.Name = "Other";
-                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[] 
+                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
                                     {
-                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue => 
+                                        ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                                         {
                                             singleValue.Name = "Category";
                                             singleValue.NominalValue = new IfcLabel("Walls");
@@ -581,10 +578,10 @@ namespace JSON2IFC
                                         })
                                     });
                                 });
-                                IfcPropertySet PsetPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet => 
+                                IfcPropertySet PsetPropertySet = ifcStore.Instances.New<IfcPropertySet>(propertySet =>
                                 {
                                     propertySet.Name = "Pset_WallCommon";
-                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[] 
+                                    propertySet.HasProperties.AddRange(new IfcPropertySingleValue[]
                                     {
                                         ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                                         {
@@ -624,15 +621,15 @@ namespace JSON2IFC
                                         });
                                     });
                                     //showcase appearance
-                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem => 
+                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
                                     {
-                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment => 
+                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
                                         {
-                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle => 
+                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
                                             {
                                                 surfaceStyle.Name = "Wall, Common";
                                                 surfaceStyle.Side = IfcSurfaceSide.BOTH;
-                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering => 
+                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
                                                 {
                                                     surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
                                                     {
@@ -750,7 +747,7 @@ namespace JSON2IFC
                                     });
                                     ifcRelDefinesByType.RelatedObjects.Add(ifcWall);
                                     ifcRelAssociatesMaterial.RelatedObjects.Add(ifcWall);
-                                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties => 
+                                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
                                     {
                                         relDefinesByProperties.RelatedObjects.Add(ifcWall);
                                         relDefinesByProperties.RelatingPropertyDefinition = otherPropertySet;
@@ -789,7 +786,7 @@ namespace JSON2IFC
                                 //create material
                                 IfcRelAssociatesMaterial ifcRelAssociatesMaterial = ifcStore.Instances.New<IfcRelAssociatesMaterial>(relAssociatesMaterial =>
                                 {
-                                    relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material => 
+                                    relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material =>
                                     {
                                         material.Name = TypicalMaterial.Glass;
                                     });
@@ -870,7 +867,7 @@ namespace JSON2IFC
                                     {
                                         window.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                         {
-                                            productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation => 
+                                            productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
                                             {
                                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                 shapeRepresentation.RepresentationType = "CSG";
@@ -905,7 +902,7 @@ namespace JSON2IFC
                                         window.ObjectPlacement = ifcBuilding.ObjectPlacement;
                                         window.PredefinedType = IfcWindowTypeEnum.NOTDEFINED;
                                     });
-                                    IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(p => 
+                                    IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(p =>
                                     {
                                         p.RelatedObjects.Add(ifcWindow);
                                         p.RelatingType = ifcStore.Instances.New<IfcWindowType>(windowType =>
@@ -1088,7 +1085,7 @@ namespace JSON2IFC
                                         material.Name = TypicalMaterial.Concrete;
                                     });
                                 });
-                                foreach(jsonSlab jsonSlab in js.Slab)
+                                foreach (jsonSlab jsonSlab in js.Slab)
                                 {
                                     double thickness = jsonSlab.thickness * UNIT_CONVERSION;
                                     jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0) * UNIT_CONVERSION;
@@ -1282,17 +1279,151 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
-                        if(type == TypeIFC.Structure) ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString() + ".ifc"), StorageType.Ifc);
+                        if (type == TypeIFC.Structure) ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString() + ".ifc"), StorageType.Ifc);
                     }
                     if (type == TypeIFC.MEP || type == TypeIFC.Model)
                     {
                         jsonMEP jmep = readJSONMEP();
                         List<IfcExtrudedAreaSolid> ifcPipeRepresentations = new List<IfcExtrudedAreaSolid>();
-                        List<IfcExtrudedAreaSolid> ifcEllbowRepresentations = new List<IfcExtrudedAreaSolid>();
+                        List<IfcRevolvedAreaSolid> ifcEllbowRepresentations = new List<IfcRevolvedAreaSolid>();
                         List<IfcExtrudedAreaSolid> ifcTFittingRepresentations = new List<IfcExtrudedAreaSolid>();
+                        List<jsonPipe> pipes = new List<jsonPipe>();
+                        if (jmep.pipe != null)
+                        {
+                            pipes.AddRange(jmep.pipe);
+                        }
+                        if (jmep.Elbow_Pipe_Junction != null)
+                        {
+                            jsonPipe pipe1 = null, pipe2 = null;
+                            jsonXYZ center = null, shifting_dir, p1_dir, p2_dir;
+                            List<jsonXYZ> pipe1Points = null, pipe2Points = null;
+                            double average_radius, angle, shifting;
+                            foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction)
+                            {
 
+                                pipe1 = pipes.Find(x => x.ID.Equals(jsonFitting.Pipe_Index_1));
+                                pipe2 = pipes.Find(x => x.ID.Equals(jsonFitting.Pipe_Index_2));
+                                if (pipe1 != null && pipe2 != null && pipe1.length != 0 && pipe2.length != 0)
+                                {
+
+                                    pipe1Points = new List<jsonXYZ>() { pipe1.Startpoint, pipe1.Endpoint };
+                                    pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
+                                    double minDis = Double.MaxValue;
+                                    foreach (jsonXYZ pt1 in pipe1Points)
+                                    {
+                                        foreach (jsonXYZ pt2 in pipe2Points)
+                                        {
+                                            if (minDis > pt1.distanceTo(pt2))
+                                            {
+                                                minDis = pt1.distanceTo(pt2);
+                                                pipe1.Startpoint = pt1;
+                                                pipe2.Startpoint = pt2;
+                                            }
+                                        }
+                                    }
+                                    pipe1.Endpoint = pipe1Points.Find(x => !x.Equals(pipe1.Startpoint));
+                                    pipe2.Endpoint = pipe2Points.Find(x => !x.Equals(pipe2.Startpoint));
+
+                                    p1_dir = pipe1.direction;
+                                    p2_dir = pipe2.direction;
+
+                                    shifting_dir = (p1_dir + p2_dir).normalized();
+                                    average_radius = (pipe1.Radius + pipe2.Radius) / 2;
+                                    center = (pipe1.Startpoint + pipe2.Startpoint) / 2;
+                                    angle = pipe1.direction.angleTo(pipe2.direction);
+                                    shifting = Math.Min(Math.Min(pipe2.length, pipe1.length), average_radius * FITTING_RADIUS_RATIO);
+                                    pipe1.Startpoint += pipe1.direction * shifting;
+                                    pipe2.Startpoint += pipe2.direction * shifting;
+
+                                    center += pipe1.Startpoint.distanceTo(center) / Math.Sin(Math.PI / 2 - angle / 2) * shifting_dir;
+
+
+                                    jsonFitting.angle = Math.PI - angle;
+                                    jsonFitting.radius = average_radius;
+
+                                    jsonFitting.center = center;
+                                    jsonFitting.axis = p1_dir.crossProduct(p2_dir).normalized();
+
+                                    jsonFitting.refAxis = -p1_dir;
+                                    jsonFitting.location = pipe1.Startpoint;
+                                    jsonFitting.isValid = true;
+                                }
+                                else if (pipe1 == null || pipe2 == null) error_msg += "Creating Ellbow but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
+                                else if (pipe1.length == 0 && pipe2.length == 0) error_msg += "Creating Ellbow but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
+                            }
+                        }
+                        if (jmep.T_Pipe_Junction != null)
+                        {
+                            jsonPipe pipe1 = null, pipe2 = null, pipe3 = null;
+                            List<jsonXYZ> pipe1Points = null, pipe2Points = null, pipe3Points = null;
+                            jsonXYZ p1_dir = null, p2_dir = null, p3_dir = null, center = null;
+                            double shifting = Double.MaxValue, average_radius;
+                            foreach (jsonTee jsonTee in jmep.T_Pipe_Junction)
+                            {
+
+                                pipe1 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_1));
+                                pipe2 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_2));
+                                pipe3 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_3));
+                                if (pipe1 != null && pipe2 != null && pipe3 != null && pipe1.length != 0 && pipe2.length != 0 && pipe3.length != 0)
+                                {
+
+                                    pipe1Points = new List<jsonXYZ>() { pipe1.Startpoint, pipe1.Endpoint };
+                                    pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
+                                    pipe3Points = new List<jsonXYZ>() { pipe3.Startpoint, pipe3.Endpoint };
+                                    double minDis = Double.MaxValue;
+                                    foreach (jsonXYZ pt1 in pipe1Points)
+                                    {
+                                        foreach (jsonXYZ pt2 in pipe2Points)
+                                        {
+                                            if (minDis > pt1.distanceTo(pt2))
+                                            {
+                                                minDis = pt1.distanceTo(pt2);
+                                                pipe1.Startpoint = pt1;
+                                                pipe2.Startpoint = pt2;
+                                            }
+                                        }
+                                    }
+                                    pipe1.Endpoint = pipe1Points.Find(x => !x.Equals(pipe1.Startpoint));
+                                    pipe2.Endpoint = pipe2Points.Find(x => !x.Equals(pipe2.Startpoint));
+                                    minDis = Double.MaxValue;
+                                    foreach (jsonXYZ pt3 in pipe3Points)
+                                    {
+                                        if (minDis > pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2))
+                                        {
+                                            minDis = pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2);
+                                            pipe3.Startpoint = pt3;
+                                        }
+                                    }
+                                    pipe3.Endpoint = pipe3Points.Find(x => !x.Equals(pipe3.Startpoint));
+                                    p1_dir = pipe1.direction;
+                                    p2_dir = pipe2.direction;
+                                    p3_dir = pipe3.direction;
+
+                                    average_radius = (pipe1.Radius + pipe2.Radius + pipe3.Radius) / 3;
+
+                                    center = (pipe1.Startpoint + pipe2.Startpoint) / 2;
+
+                                    shifting = Math.Min(pipe1.length, average_radius * FITTING_RADIUS_RATIO);
+                                    shifting = Math.Min(pipe2.length, shifting);
+                                    shifting = Math.Min(pipe3.length, shifting);
+
+                                    pipe1.Startpoint += pipe1.direction * shifting;
+                                    pipe2.Startpoint += pipe2.direction * shifting;
+                                    pipe3.Startpoint += pipe3.direction * shifting;
+
+                                    jsonTee.center = center;
+
+                                    jsonTee.Pt1 = pipe1.Startpoint;
+                                    jsonTee.Pt2 = pipe2.Startpoint;
+                                    jsonTee.Pt3 = pipe3.Startpoint;
+                                    jsonTee.isValid = true;
+                                }
+                                else if (pipe1 == null || pipe2 == null || pipe3 == null) error_msg += "Creating Tee but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1 == null || pipe2 == null) && pipe3 == null) ? " & " : "") + (pipe3 == null ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
+                                else if (pipe1.length == 0 || pipe2.length == 0 || pipe3.length == 0) error_msg += "Creating Tee but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1.length == 0 || pipe2.length == 0) && pipe3.length == 0) ? " & " : "") + (pipe3.length == 0 ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
+                            }
+                        }
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
-                        using (var txn = ifcStore.BeginTransaction("Create Columns"))
+                        using (var txn = ifcStore.BeginTransaction("Create Pipes"))
                         {
                             //create pipes
                             if (jmep.pipe != null)
@@ -1307,11 +1438,16 @@ namespace JSON2IFC
                                 });
                                 foreach (jsonPipe jsonPipe in jmep.pipe)
                                 {
-                                    double length = jsonPipe.length * 1000;
-                                    double radius = jsonPipe.Radius * 1000;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.X, jsonPipe.Startpoint.Y, jsonPipe.Startpoint.Z) * 1000;
-                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).X, (jsonPipe.Endpoint - jsonPipe.Startpoint).Y, (jsonPipe.Endpoint - jsonPipe.Startpoint).Z) * 1000;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * 1000;
+                                    if (jsonPipe.Startpoint.X == jsonPipe.Endpoint.X && jsonPipe.Startpoint.Y == jsonPipe.Endpoint.Y && jsonPipe.Startpoint.Z == jsonPipe.Endpoint.Z)
+                                    {
+                                        error_msg += "Creating Pipe but the pipe is too short: #" + jsonPipe.ID.ToString() + "\n";
+                                        continue;
+                                    }
+                                    double length = jsonPipe.length * UNIT_CONVERSION;
+                                    double radius = jsonPipe.Radius * UNIT_CONVERSION;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.X, jsonPipe.Startpoint.Y, jsonPipe.Startpoint.Z) * UNIT_CONVERSION;
+                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).X, (jsonPipe.Endpoint - jsonPipe.Startpoint).Y, (jsonPipe.Endpoint - jsonPipe.Startpoint).Z) * UNIT_CONVERSION;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
                                     IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
@@ -1393,6 +1529,245 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
+                        using (var txn = ifcStore.BeginTransaction("Create Pipe Ellbows"))
+                        {
+                            //create pipe ellbows
+                            jsonPipe pipe1 = null, pipe2 = null;
+                            if (jmep.Elbow_Pipe_Junction != null)
+                            {
+                                //create material
+                                IfcRelAssociatesMaterial ifcRelAssociatesMaterial = ifcStore.Instances.New<IfcRelAssociatesMaterial>(relAssociatesMaterial =>
+                                {
+                                    relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material =>
+                                    {
+                                        material.Name = TypicalMaterial.PVC;
+                                    });
+                                });
+                                foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction)
+                                {
+                                    pipe1 = pipes.Find(x => x.ID == jsonFitting.Pipe_Index_1);
+                                    pipe2 = pipes.Find(x => x.ID == jsonFitting.Pipe_Index_2);
+                                    if (pipe1 != null && pipe2 != null && jsonFitting.isValid)
+                                    {
+                                        double angle = jsonFitting.angle;
+                                        double radius = jsonFitting.radius * UNIT_CONVERSION;
+                                        jsonXYZ rotationAxis = jsonXYZ.YBasis * UNIT_CONVERSION;
+                                        jsonXYZ rotationCenter = (jsonFitting.center.distanceTo(jsonFitting.location) * jsonXYZ.XBasis) * UNIT_CONVERSION;
+
+                                        jsonXYZ locationJsonXYZ = jsonFitting.location * UNIT_CONVERSION;
+                                        jsonXYZ axisJsonXYZ = jsonFitting.refAxis * UNIT_CONVERSION;
+                                        jsonXYZ refDirJsonXYZ = (jsonFitting.center - jsonFitting.location) * UNIT_CONVERSION;
+
+                                        //axis: Z dir; refDirection: X dir
+                                        //showcase appearance
+                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                        {
+                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                            {
+                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                {
+                                                    surfaceStyle.Name = "PVC, common";
+                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                    {
+                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                        {
+                                                            colorRGB.Red = 0.5;
+                                                            colorRGB.Green = 0.5;
+                                                            colorRGB.Blue = 0.5;
+                                                        });
+                                                        surfaceStyleRendering.Transparency = 0;
+                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                    }));
+                                                }));
+                                            }));
+                                        });
+                                        IIfcFlowFitting ifcFlowFitting = new Create(ifcStore).FlowFitting(flowFitting =>
+                                        {
+                                            flowFitting.Name = "Ellbow: " + jsonFitting.Pipe_Index_1.ToString() + " & " + jsonFitting.Pipe_Index_2.ToString();
+                                            flowFitting.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
+                                            {
+                                                productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
+                                                {
+                                                    shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
+                                                    shapeRepresentation.RepresentationIdentifier = "SweptSolid";
+                                                    shapeRepresentation.RepresentationIdentifier = "Body";
+                                                    shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcRevolvedAreaSolid>(revolvedAreaSolid =>
+                                                    {
+                                                        revolvedAreaSolid.Angle = angle;
+                                                        revolvedAreaSolid.SweptArea = ifcStore.Instances.New<IfcCircleProfileDef>(circleProfileDef =>
+                                                        {
+                                                            circleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                            circleProfileDef.ProfileName = "";
+                                                            circleProfileDef.Radius = radius;
+                                                            circleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                            {
+                                                                axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                                {
+                                                                    cartesianPoint.SetXY(0, 0);
+                                                                });
+                                                            });
+                                                        });
+                                                        revolvedAreaSolid.Axis = ifcStore.Instances.New<IfcAxis1Placement>(axis1Placement =>
+                                                        {
+                                                            axis1Placement.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                            {
+                                                                direction.SetXYZ(rotationAxis.X, rotationAxis.Y, rotationAxis.Z);
+                                                            });
+                                                            axis1Placement.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                            {
+                                                                cartesianPoint.SetXYZ(rotationCenter.X, rotationCenter.Y, rotationCenter.Z);
+                                                            });
+                                                        });
+                                                        revolvedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                        {
+                                                            axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                            {
+                                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                            });
+                                                            axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                            {
+                                                                direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                            });
+                                                            axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                            {
+                                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                            });
+                                                        });
+                                                        ifcEllbowRepresentations.Add(revolvedAreaSolid);
+                                                        ifcStyledItem.Item = revolvedAreaSolid;
+                                                    }));
+                                                }));
+                                            });
+                                            flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
+                                        });
+                                        ifcRelAssociatesMaterial.RelatedObjects.Add(ifcFlowFitting);
+                                        ifcProducts.Add((IfcProduct)ifcFlowFitting);
+                                    }
+                                }
+                            }
+                            txn.Commit();
+                        }
+                        using (var txn = ifcStore.BeginTransaction("Create Pipe Tees"))
+                        {
+                            //create pipe Tees
+                            jsonPipe pipe1 = null, pipe2 = null, pipe3 = null;
+                            if (jmep.T_Pipe_Junction != null)
+                            {
+                                //create material
+                                IfcRelAssociatesMaterial ifcRelAssociatesMaterial = ifcStore.Instances.New<IfcRelAssociatesMaterial>(relAssociatesMaterial =>
+                                {
+                                    relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material =>
+                                    {
+                                        material.Name = TypicalMaterial.PVC;
+                                    });
+                                });
+                                foreach (jsonTee jsonTee in jmep.T_Pipe_Junction)
+                                {
+                                    pipe1 = pipes.Find(x => x.ID == jsonTee.Pipe_Index_1);
+                                    pipe2 = pipes.Find(x => x.ID == jsonTee.Pipe_Index_2);
+                                    pipe3 = pipes.Find(x => x.ID == jsonTee.Pipe_Index_3);
+                                    if (pipe1 != null && pipe2 != null && pipe3 != null && jsonTee.isValid)
+                                    {
+                                        List<jsonXYZ> pts = new List<jsonXYZ>() { jsonTee.Pt1, jsonTee.Pt2, jsonTee.Pt3 };
+                                        List<jsonPipe> connectedPipes = new List<jsonPipe>() { pipe1, pipe2, pipe3 };
+                                        double radius;
+                                        double depth;
+                                        jsonXYZ locationJsonXYZ = null, axisJsonXYZ = null, refDirJsonXYZ = null;
+
+                                        //axis: Z dir; refDirection: X dir
+                                        //showcase appearance
+                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                        {
+                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                            {
+                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                {
+                                                    surfaceStyle.Name = "PVC, common";
+                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                    {
+                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                        {
+                                                            colorRGB.Red = 0.5;
+                                                            colorRGB.Green = 0.5;
+                                                            colorRGB.Blue = 0.5;
+                                                        });
+                                                        surfaceStyleRendering.Transparency = 0;
+                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                    }));
+                                                }));
+                                            }));
+                                        });
+                                        IIfcFlowFitting ifcFlowFitting = new Create(ifcStore).FlowFitting(flowFitting =>
+                                        {
+                                            flowFitting.Name = "Tee: " + jsonTee.Pipe_Index_1.ToString() + " , " + jsonTee.Pipe_Index_2.ToString() + " & " + jsonTee.Pipe_Index_3.ToString();
+                                            flowFitting.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
+                                            {
+                                                productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
+                                                {
+                                                    shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
+                                                    shapeRepresentation.RepresentationIdentifier = "SweptSolid";
+                                                    shapeRepresentation.RepresentationIdentifier = "Body";
+                                                    var zip = pts.Zip(connectedPipes, (pt, pipe) => new { pt, pipe });
+                                                    foreach (var z in zip)
+                                                    {
+                                                        radius = z.pipe.Radius * UNIT_CONVERSION;
+                                                        depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
+                                                        locationJsonXYZ = z.pt * UNIT_CONVERSION;
+                                                        axisJsonXYZ = (jsonTee.center - z.pt) * UNIT_CONVERSION;
+                                                        refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * UNIT_CONVERSION;
+                                                        shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
+                                                        {
+                                                            extrudedAreaSolid.Depth = depth;
+                                                            extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcCircleProfileDef>(circleProfileDef =>
+                                                            {
+                                                                circleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                                circleProfileDef.ProfileName = "";
+                                                                circleProfileDef.Radius = radius;
+                                                                circleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                                {
+                                                                    axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                                    {
+                                                                        cartesianPoint.SetXY(0, 0);
+                                                                    });
+                                                                });
+                                                            });
+                                                            extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                            extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                            {
+                                                                axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                                {
+                                                                    cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                                });
+                                                                axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                                {
+                                                                    direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                                });
+                                                                axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                                {
+                                                                    direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                                });
+                                                            });
+                                                            ifcTFittingRepresentations.Add(extrudedAreaSolid);
+                                                            ifcStyledItem.Item = extrudedAreaSolid;
+                                                        }));
+                                                    }
+                                                }));
+                                            });
+                                            flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
+                                        });
+                                        ifcRelAssociatesMaterial.RelatedObjects.Add(ifcFlowFitting);
+                                        ifcProducts.Add((IfcProduct)ifcFlowFitting);
+                                    }
+                                }
+                            }
+                            txn.Commit();
+                        }
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
                             ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
@@ -1402,6 +1777,7 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
+                        if(error_msg != "") WriteError(error_msg, path);
                         ifcStore.SaveAs(Path.Combine(path, type.ToString() + " " + release.ToString().ToUpper() + ".ifc"), StorageType.Ifc);
                     }
 
@@ -1470,6 +1846,14 @@ namespace JSON2IFC
                 txn.Commit();
             }
             return storey;
+        }
+        public static void WriteError(string s, string path)
+        {
+            FileStream fs = new FileStream(Path.Combine(path, "Error.txt"), FileMode.Create);
+            byte[] data = System.Text.Encoding.Default.GetBytes(s);
+            fs.Write(data, 0, data.Length);
+            fs.Flush();
+            fs.Close();
         }
         //Structure
         public class jsonStructure
@@ -1632,6 +2016,7 @@ namespace JSON2IFC
             public static jsonXYZ XBasis => new jsonXYZ(1, 0, 0);
             public static jsonXYZ YBasis => new jsonXYZ(0, 1, 0);
             public static jsonXYZ ZBasis => new jsonXYZ(0, 0, 1);
+            public static jsonXYZ Zero => new jsonXYZ(0, 0, 0);
             public double X { get; set; }
             public double Y { get; set; }
             public double Z { get; set; }
@@ -1640,6 +2025,26 @@ namespace JSON2IFC
                 this.X = x;
                 this.Y = y;
                 this.Z = z;
+            }
+            public jsonXYZ crossProduct(jsonXYZ pt)
+            {
+                return new jsonXYZ(this.Y * pt.Z - this.Z * pt.Y, -(this.X * pt.Z - this.Z * pt.X), this.X * pt.Y - this.Y * pt.X);
+            }
+            public double angleTo(jsonXYZ dir)
+            {
+                return Math.Acos(this.dotProduct(dir) / (dir.distanceTo(jsonXYZ.Zero)) / (this.distanceTo(jsonXYZ.Zero)));
+            }
+            public jsonXYZ projectTo(jsonXYZ pt1, jsonXYZ pt2)
+            {
+                return pt2 - (pt2 - this).dotProduct((pt2 - pt1).normalized()) * ((pt2 - pt1).normalized());
+            }
+            public bool coincide(jsonXYZ obj)
+            {
+                return (this.X == obj.X && this.Y == obj.Y && this.Z == obj.Z);
+            }
+            public override string ToString()
+            {
+                return "jsonXYZ(" + this.X.ToString() + ", " + this.Y.ToString() + ", " + this.Z.ToString() + ")";
             }
             public double distanceTo(jsonXYZ p)
             {
@@ -1681,7 +2086,13 @@ namespace JSON2IFC
             }
             public jsonXYZ normalized()
             {
-                return this / Math.Sqrt(this.dotProduct(this));
+                if (Math.Sqrt(this.dotProduct(this)) == 0)
+                {
+                    Exception e =  new Exception("Invalid Vector for Nomalization: length == 0");
+                    Debug.Print(e.StackTrace);
+                    throw e;
+                };
+                return this / Math.Sqrt(this.dotProduct(this)); 
             }
             public jsonXYZ transformToijk(jsonXYZ i, jsonXYZ j, jsonXYZ k)
             {
@@ -1724,17 +2135,30 @@ namespace JSON2IFC
             public jsonXYZ Startpoint { get; set; }
             public jsonXYZ Endpoint { get; set; }
             public double length { get { return this.Startpoint.distanceTo(this.Endpoint); } set { } }
+            public jsonXYZ direction { get { return (this.Endpoint - this.Startpoint).normalized(); } }
         }
         public class jsonFitting
         {
             public int Pipe_Index_1 { get; set; }
             public int Pipe_Index_2 { get; set; }
+            public jsonXYZ center;
+            public double angle { get; set; }
+            public double radius { get; set; }
+            public jsonXYZ axis { get; set; }
+            public jsonXYZ location { get; set; }
+            public jsonXYZ refAxis { get; set; }
+            public bool isValid { get; set; }
         }
         public class jsonTee
         {
             public int Pipe_Index_1 { get; set; }
             public int Pipe_Index_2 { get; set; }
             public int Pipe_Index_3 { get; set; }
+            public jsonXYZ center { get; set; }
+            public jsonXYZ Pt1 { get; set; }
+            public jsonXYZ Pt2 { get; set; }
+            public jsonXYZ Pt3 { get; set; }
+            public bool isValid { get; set; }
         }
     }
 }
