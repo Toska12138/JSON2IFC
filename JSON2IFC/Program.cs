@@ -51,7 +51,8 @@ namespace JSON2IFC
         internal const double UNIT_CONVERSION = 1000;
         internal const double WINDOW_WIDTH = 0.05;
         internal const double DOOR_WIDTH = 0.07;
-        internal const double FITTING_RADIUS_RATIO = 2;
+        internal const double FITTING_RADIUS_RATIO = 1.5;
+        internal const double PIPE_LENGTH_LIMIT = 0.01;
         static jsonStructure readJSONStructure()
         {
             string strReadFilePath = @".\Data\recon.json";
@@ -1331,7 +1332,7 @@ namespace JSON2IFC
                                     average_radius = (pipe1.Radius + pipe2.Radius) / 2;
                                     center = (pipe1.Startpoint + pipe2.Startpoint) / 2;
                                     angle = pipe1.direction.angleTo(pipe2.direction);
-                                    shifting = Math.Min(Math.Min(pipe2.length, pipe1.length), average_radius * FITTING_RADIUS_RATIO);
+                                    shifting = Math.Min(Math.Min(pipe2.length * (1 - PIPE_LENGTH_LIMIT), pipe1.length * (1 - PIPE_LENGTH_LIMIT)), average_radius * FITTING_RADIUS_RATIO);
                                     pipe1.Startpoint += pipe1.direction * shifting;
                                     pipe2.Startpoint += pipe2.direction * shifting;
 
@@ -1366,57 +1367,92 @@ namespace JSON2IFC
                                 pipe3 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_3));
                                 if (pipe1 != null && pipe2 != null && pipe3 != null && pipe1.length != 0 && pipe2.length != 0 && pipe3.length != 0)
                                 {
-
-                                    pipe1Points = new List<jsonXYZ>() { pipe1.Startpoint, pipe1.Endpoint };
-                                    pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
-                                    pipe3Points = new List<jsonXYZ>() { pipe3.Startpoint, pipe3.Endpoint };
-                                    double minDis = Double.MaxValue;
-                                    foreach (jsonXYZ pt1 in pipe1Points)
+                                    if(pipe1.ID != pipe2.ID)
                                     {
-                                        foreach (jsonXYZ pt2 in pipe2Points)
+                                        pipe1Points = new List<jsonXYZ>() { pipe1.Startpoint, pipe1.Endpoint };
+                                        pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
+                                        pipe3Points = new List<jsonXYZ>() { pipe3.Startpoint, pipe3.Endpoint };
+                                        double minDis = Double.MaxValue;
+                                        foreach (jsonXYZ pt1 in pipe1Points)
                                         {
-                                            if (minDis > pt1.distanceTo(pt2))
+                                            foreach (jsonXYZ pt2 in pipe2Points)
                                             {
-                                                minDis = pt1.distanceTo(pt2);
-                                                pipe1.Startpoint = pt1;
-                                                pipe2.Startpoint = pt2;
+                                                if (minDis > pt1.distanceTo(pt2))
+                                                {
+                                                    minDis = pt1.distanceTo(pt2);
+                                                    pipe1.Startpoint = pt1;
+                                                    pipe2.Startpoint = pt2;
+                                                }
                                             }
                                         }
-                                    }
-                                    pipe1.Endpoint = pipe1Points.Find(x => !x.Equals(pipe1.Startpoint));
-                                    pipe2.Endpoint = pipe2Points.Find(x => !x.Equals(pipe2.Startpoint));
-                                    minDis = Double.MaxValue;
-                                    foreach (jsonXYZ pt3 in pipe3Points)
-                                    {
-                                        if (minDis > pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2))
+                                        pipe1.Endpoint = pipe1Points.Find(x => !x.Equals(pipe1.Startpoint));
+                                        pipe2.Endpoint = pipe2Points.Find(x => !x.Equals(pipe2.Startpoint));
+                                        minDis = Double.MaxValue;
+                                        foreach (jsonXYZ pt3 in pipe3Points)
                                         {
-                                            minDis = pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2);
-                                            pipe3.Startpoint = pt3;
+                                            if (minDis > pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2))
+                                            {
+                                                minDis = pt3.distanceTo((pipe1.Startpoint + pipe2.Startpoint) / 2);
+                                                pipe3.Startpoint = pt3;
+                                            }
                                         }
+                                        pipe3.Endpoint = pipe3Points.Find(x => !x.Equals(pipe3.Startpoint));
+                                        p1_dir = pipe1.direction;
+                                        p2_dir = pipe2.direction;
+                                        p3_dir = pipe3.direction;
+
+                                        average_radius = (pipe1.Radius + pipe2.Radius + pipe3.Radius) / 3;
+
+                                        center = (pipe1.Startpoint + pipe2.Startpoint) / 2;
+
+                                        shifting = Math.Min(pipe1.length * (1 - PIPE_LENGTH_LIMIT), average_radius * FITTING_RADIUS_RATIO);
+                                        shifting = Math.Min(pipe2.length * (1 - PIPE_LENGTH_LIMIT), shifting);
+                                        shifting = Math.Min(pipe3.length * (1 - PIPE_LENGTH_LIMIT), shifting);
+
+                                        pipe1.Startpoint += pipe1.direction * shifting;
+                                        pipe2.Startpoint += pipe2.direction * shifting;
+                                        pipe3.Startpoint += pipe3.direction * shifting;
+
+                                        jsonTee.center = center;
+
+                                        jsonTee.Pt1 = pipe1.Startpoint;
+                                        jsonTee.Pt2 = pipe2.Startpoint;
+                                        jsonTee.Pt3 = pipe3.Startpoint;
+                                        jsonTee.isValid = true;
                                     }
-                                    pipe3.Endpoint = pipe3Points.Find(x => !x.Equals(pipe3.Startpoint));
-                                    p1_dir = pipe1.direction;
-                                    p2_dir = pipe2.direction;
-                                    p3_dir = pipe3.direction;
+                                    else if(jsonTee.center != null)
+                                    {
+                                        pipe1Points = new List<jsonXYZ>() { pipe1.Startpoint, pipe1.Endpoint };
+                                        pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
+                                        pipe3Points = new List<jsonXYZ>() { pipe3.Startpoint, pipe3.Endpoint };
+                                        double minDis = Double.MaxValue;
 
-                                    average_radius = (pipe1.Radius + pipe2.Radius + pipe3.Radius) / 3;
+                                        foreach (jsonXYZ pt3 in pipe3Points)
+                                        {
+                                            if (minDis > pt3.distanceTo(jsonTee.center))
+                                            {
+                                                minDis = pt3.distanceTo(jsonTee.center);
+                                                pipe3.Startpoint = pt3;
+                                            }
+                                        }
+                                        pipe3.Endpoint = pipe3Points.Find(x => !x.Equals(pipe3.Startpoint));
+                                        p1_dir = pipe1.direction;
+                                        p2_dir = pipe2.direction;
+                                        p3_dir = pipe3.direction;
 
-                                    center = (pipe1.Startpoint + pipe2.Startpoint) / 2;
+                                        average_radius = (pipe1.Radius + pipe2.Radius + pipe3.Radius) / 3;
 
-                                    shifting = Math.Min(pipe1.length, average_radius * FITTING_RADIUS_RATIO);
-                                    shifting = Math.Min(pipe2.length, shifting);
-                                    shifting = Math.Min(pipe3.length, shifting);
+                                        shifting = Math.Min(pipe1.Startpoint.distanceTo(jsonTee.center) * (1 - PIPE_LENGTH_LIMIT), average_radius * FITTING_RADIUS_RATIO);
+                                        shifting = Math.Min(pipe1.Endpoint.distanceTo(jsonTee.center) * (1 - PIPE_LENGTH_LIMIT), shifting);
+                                        shifting = Math.Min(pipe3.length * (1 - PIPE_LENGTH_LIMIT), shifting);
 
-                                    pipe1.Startpoint += pipe1.direction * shifting;
-                                    pipe2.Startpoint += pipe2.direction * shifting;
-                                    pipe3.Startpoint += pipe3.direction * shifting;
+                                        pipe3.Startpoint += pipe3.direction * shifting;
 
-                                    jsonTee.center = center;
-
-                                    jsonTee.Pt1 = pipe1.Startpoint;
-                                    jsonTee.Pt2 = pipe2.Startpoint;
-                                    jsonTee.Pt3 = pipe3.Startpoint;
-                                    jsonTee.isValid = true;
+                                        jsonTee.Pt1 = center + p1_dir * shifting;
+                                        jsonTee.Pt2 = center - p1_dir * shifting;
+                                        jsonTee.Pt3 = pipe3.Startpoint;
+                                        jsonTee.isValid = true;
+                                    }
                                 }
                                 else if (pipe1 == null || pipe2 == null || pipe3 == null) error_msg += "ERROR: Creating Tee but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1 == null || pipe2 == null) && pipe3 == null) ? " & " : "") + (pipe3 == null ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
                                 else if (pipe1.length == 0 || pipe2.length == 0 || pipe3.length == 0) error_msg += "ERROR: Creating Tee but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1.length == 0 || pipe2.length == 0) && pipe3.length == 0) ? " & " : "") + (pipe3.length == 0 ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
@@ -1438,9 +1474,9 @@ namespace JSON2IFC
                                 });
                                 foreach (jsonPipe jsonPipe in jmep.pipe)
                                 {
-                                    if (jsonPipe.Startpoint.X == jsonPipe.Endpoint.X && jsonPipe.Startpoint.Y == jsonPipe.Endpoint.Y && jsonPipe.Startpoint.Z == jsonPipe.Endpoint.Z)
+                                    if (jsonPipe.length == 0)
                                     {
-                                        error_msg += "Creating Pipe but the pipe is too short: #" + jsonPipe.ID.ToString() + "\n";
+                                        error_msg += "ERROR: Creating Pipe but the pipe is too short: #" + jsonPipe.ID.ToString() + "\n";
                                         continue;
                                     }
                                     double length = jsonPipe.length * UNIT_CONVERSION;
@@ -1559,7 +1595,7 @@ namespace JSON2IFC
                                         jsonXYZ refDirJsonXYZ = (jsonFitting.center - jsonFitting.location) * UNIT_CONVERSION;
                                         if (radius > rotationCenter.X)
                                         {
-                                            error_msg += "WARNING: Creating Ellbow but the pipe is too short for revolving";
+                                            error_msg += "WARNING: Creating Ellbow but the pipe is too short for revolving\n";
                                             continue;
                                         }
                                         //axis: Z dir; refDirection: X dir

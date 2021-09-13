@@ -24,32 +24,3 @@ ERROR: Creating Ellbow but cannot find pipe, index: #271
 ERROR: Creating Ellbow but cannot find pipe, index: #283
 ERROR: Creating Ellbow but cannot find pipe, index: #305
 ERROR: Creating Ellbow but cannot find pipe, index: #282
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #325
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #332
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #333
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #335
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #344
-ERROR: Creating Tee but the pipe(s) is/are too short, index: #346
-Creating Pipe but the pipe is too short: #121
-Creating Pipe but the pipe is too short: #128
-Creating Pipe but the pipe is too short: #130
-Creating Pipe but the pipe is too short: #143
-Creating Pipe but the pipe is too short: #159
-Creating Pipe but the pipe is too short: #207
-Creating Pipe but the pipe is too short: #252
-Creating Pipe but the pipe is too short: #324
-Creating Pipe but the pipe is too short: #325
-Creating Pipe but the pipe is too short: #326
-Creating Pipe but the pipe is too short: #329
-Creating Pipe but the pipe is too short: #332
-Creating Pipe but the pipe is too short: #333
-Creating Pipe but the pipe is too short: #334
-Creating Pipe but the pipe is too short: #335
-Creating Pipe but the pipe is too short: #336
-Creating Pipe but the pipe is too short: #338
-Creating Pipe but the pipe is too short: #340
-Creating Pipe but the pipe is too short: #341
-Creating Pipe but the pipe is too short: #342
-Creating Pipe but the pipe is too short: #344
-Creating Pipe but the pipe is too short: #346
-WARNING: Creating Ellbow but the pipe is too short for revolving
