@@ -1348,8 +1348,8 @@ namespace JSON2IFC
                                     jsonFitting.location = pipe1.Startpoint;
                                     jsonFitting.isValid = true;
                                 }
-                                else if (pipe1 == null || pipe2 == null) error_msg += "Creating Ellbow but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
-                                else if (pipe1.length == 0 && pipe2.length == 0) error_msg += "Creating Ellbow but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
+                                else if (pipe1 == null || pipe2 == null) error_msg += "ERROR: Creating Ellbow but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
+                                else if (pipe1.length == 0 && pipe2.length == 0) error_msg += "ERROR: Creating Ellbow but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonFitting.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonFitting.Pipe_Index_2.ToString()) : "") + "\n";
                             }
                         }
                         if (jmep.T_Pipe_Junction != null)
@@ -1418,8 +1418,8 @@ namespace JSON2IFC
                                     jsonTee.Pt3 = pipe3.Startpoint;
                                     jsonTee.isValid = true;
                                 }
-                                else if (pipe1 == null || pipe2 == null || pipe3 == null) error_msg += "Creating Tee but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1 == null || pipe2 == null) && pipe3 == null) ? " & " : "") + (pipe3 == null ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
-                                else if (pipe1.length == 0 || pipe2.length == 0 || pipe3.length == 0) error_msg += "Creating Tee but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1.length == 0 || pipe2.length == 0) && pipe3.length == 0) ? " & " : "") + (pipe3.length == 0 ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
+                                else if (pipe1 == null || pipe2 == null || pipe3 == null) error_msg += "ERROR: Creating Tee but cannot find pipe, index: " + (pipe1 == null ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1 == null && pipe2 == null ? " & " : "") + (pipe2 == null ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1 == null || pipe2 == null) && pipe3 == null) ? " & " : "") + (pipe3 == null ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
+                                else if (pipe1.length == 0 || pipe2.length == 0 || pipe3.length == 0) error_msg += "ERROR: Creating Tee but the pipe(s) is/are too short, index: " + (pipe1.length == 0 ? ("#" + jsonTee.Pipe_Index_1.ToString()) : "") + (pipe1.length == 0 && pipe2.length == 0 ? " & " : "") + (pipe2.length == 0 ? ("#" + jsonTee.Pipe_Index_2.ToString()) : "") + (((pipe1.length == 0 || pipe2.length == 0) && pipe3.length == 0) ? " & " : "") + (pipe3.length == 0 ? ("#" + jsonTee.Pipe_Index_3.ToString()) : "") + "\n";
                             }
                         }
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
@@ -1552,48 +1552,52 @@ namespace JSON2IFC
                                         double angle = jsonFitting.angle;
                                         double radius = jsonFitting.radius * UNIT_CONVERSION;
                                         jsonXYZ rotationAxis = jsonXYZ.YBasis * UNIT_CONVERSION;
-                                        jsonXYZ rotationCenter = (jsonFitting.center.distanceTo(jsonFitting.location) * jsonXYZ.XBasis) * UNIT_CONVERSION;
+                                        jsonXYZ rotationCenter = jsonFitting.center.distanceTo(jsonFitting.location) * jsonXYZ.XBasis * UNIT_CONVERSION;
 
                                         jsonXYZ locationJsonXYZ = jsonFitting.location * UNIT_CONVERSION;
                                         jsonXYZ axisJsonXYZ = jsonFitting.refAxis * UNIT_CONVERSION;
                                         jsonXYZ refDirJsonXYZ = (jsonFitting.center - jsonFitting.location) * UNIT_CONVERSION;
-
-                                        //axis: Z dir; refDirection: X dir
-                                        //showcase appearance
-                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                        if (radius > rotationCenter.X)
                                         {
-                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
-                                            {
-                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
-                                                {
-                                                    surfaceStyle.Name = "PVC, common";
-                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
-                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
-                                                    {
-                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
-                                                        {
-                                                            colorRGB.Red = 0.5;
-                                                            colorRGB.Green = 0.5;
-                                                            colorRGB.Blue = 0.5;
-                                                        });
-                                                        surfaceStyleRendering.Transparency = 0;
-                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
-                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
-                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
-                                                    }));
-                                                }));
-                                            }));
-                                        });
+                                            error_msg += "WARNING: Creating Ellbow but the pipe is too short for revolving";
+                                            continue;
+                                        }
+                                        //axis: Z dir; refDirection: X dir
                                         IIfcFlowFitting ifcFlowFitting = new Create(ifcStore).FlowFitting(flowFitting =>
                                         {
                                             flowFitting.Name = "Ellbow: " + jsonFitting.Pipe_Index_1.ToString() + " & " + jsonFitting.Pipe_Index_2.ToString();
                                             flowFitting.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                             {
                                                 productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
-                                                {
+                                                {   
                                                     shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                     shapeRepresentation.RepresentationIdentifier = "SweptSolid";
                                                     shapeRepresentation.RepresentationIdentifier = "Body";
+                                                    //showcase appearance
+                                                    IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                                    {
+                                                        styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                                        {
+                                                            presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                            {
+                                                                surfaceStyle.Name = "PVC, common";
+                                                                surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                                surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                                {
+                                                                    surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                                    {
+                                                                        colorRGB.Red = 0.5;
+                                                                        colorRGB.Green = 0.5;
+                                                                        colorRGB.Blue = 0.5;
+                                                                    });
+                                                                    surfaceStyleRendering.Transparency = 0;
+                                                                    surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                                    surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                                    surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                                }));
+                                                            }));
+                                                        }));
+                                                    });
                                                     shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcRevolvedAreaSolid>(revolvedAreaSolid =>
                                                     {
                                                         revolvedAreaSolid.Angle = angle;
@@ -1678,31 +1682,6 @@ namespace JSON2IFC
                                         jsonXYZ locationJsonXYZ = null, axisJsonXYZ = null, refDirJsonXYZ = null;
 
                                         //axis: Z dir; refDirection: X dir
-                                        //showcase appearance
-                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
-                                        {
-                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
-                                            {
-                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
-                                                {
-                                                    surfaceStyle.Name = "PVC, common";
-                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
-                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
-                                                    {
-                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
-                                                        {
-                                                            colorRGB.Red = 0.5;
-                                                            colorRGB.Green = 0.5;
-                                                            colorRGB.Blue = 0.5;
-                                                        });
-                                                        surfaceStyleRendering.Transparency = 0;
-                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
-                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
-                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
-                                                    }));
-                                                }));
-                                            }));
-                                        });
                                         IIfcFlowFitting ifcFlowFitting = new Create(ifcStore).FlowFitting(flowFitting =>
                                         {
                                             flowFitting.Name = "Tee: " + jsonTee.Pipe_Index_1.ToString() + " , " + jsonTee.Pipe_Index_2.ToString() + " & " + jsonTee.Pipe_Index_3.ToString();
@@ -1716,6 +1695,32 @@ namespace JSON2IFC
                                                     var zip = pts.Zip(connectedPipes, (pt, pipe) => new { pt, pipe });
                                                     foreach (var z in zip)
                                                     {
+
+                                                        //showcase appearance
+                                                        IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
+                                                        {
+                                                            styledItem.Styles.Add(ifcStore.Instances.New<IfcPresentationStyleAssignment>(presentationStyleAssignment =>
+                                                            {
+                                                                presentationStyleAssignment.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyle>(surfaceStyle =>
+                                                                {
+                                                                    surfaceStyle.Name = "PVC, common";
+                                                                    surfaceStyle.Side = IfcSurfaceSide.BOTH;
+                                                                    surfaceStyle.Styles.Add(ifcStore.Instances.New<IfcSurfaceStyleRendering>(surfaceStyleRendering =>
+                                                                    {
+                                                                        surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
+                                                                        {
+                                                                            colorRGB.Red = 0.5;
+                                                                            colorRGB.Green = 0.5;
+                                                                            colorRGB.Blue = 0.5;
+                                                                        });
+                                                                        surfaceStyleRendering.Transparency = 0;
+                                                                        surfaceStyleRendering.SpecularColour = new IfcNormalisedRatioMeasure(0.5);
+                                                                        surfaceStyleRendering.SpecularHighlight = new IfcSpecularExponent(128);
+                                                                        surfaceStyleRendering.ReflectanceMethod = IfcReflectanceMethodEnum.NOTDEFINED;
+                                                                    }));
+                                                                }));
+                                                            }));
+                                                        });
                                                         radius = z.pipe.Radius * UNIT_CONVERSION;
                                                         depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
                                                         locationJsonXYZ = z.pt * UNIT_CONVERSION;
