@@ -86,7 +86,7 @@ namespace JSON2IFC
                 {
                     IfcBuilding ifcBuilding = createBuilding(ifcStore, "Building");
                     IfcBuildingStorey ifcBuildingStorey = createStorey(ifcBuilding);
-                    if (type == TypeIFC.Structure || type == TypeIFC.Model)
+                    if (type == TypeIFC.MEP || type == TypeIFC.Model)
                     {
                         jsonStructure js = readJSONStructure();
                         List<IfcExtrudedAreaSolid> ifcColumnRepresentations = new List<IfcExtrudedAreaSolid>();
@@ -1361,7 +1361,6 @@ namespace JSON2IFC
                             double shifting = Double.MaxValue, average_radius;
                             foreach (jsonTee jsonTee in jmep.T_Pipe_Junction)
                             {
-
                                 pipe1 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_1));
                                 pipe2 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_2));
                                 pipe3 = pipes.Find(x => x.ID.Equals(jsonTee.Pipe_Index_3));
@@ -1426,7 +1425,6 @@ namespace JSON2IFC
                                         pipe2Points = new List<jsonXYZ>() { pipe2.Startpoint, pipe2.Endpoint };
                                         pipe3Points = new List<jsonXYZ>() { pipe3.Startpoint, pipe3.Endpoint };
                                         double minDis = Double.MaxValue;
-
                                         foreach (jsonXYZ pt3 in pipe3Points)
                                         {
                                             if (minDis > pt3.distanceTo(jsonTee.center))
@@ -1447,9 +1445,9 @@ namespace JSON2IFC
                                         shifting = Math.Min(pipe3.length * (1 - PIPE_LENGTH_LIMIT), shifting);
 
                                         pipe3.Startpoint += pipe3.direction * shifting;
+                                        jsonTee.Pt1 = jsonTee.center + p1_dir * shifting;
+                                        jsonTee.Pt2 = jsonTee.center - p1_dir * shifting;
 
-                                        jsonTee.Pt1 = center + p1_dir * shifting;
-                                        jsonTee.Pt2 = center - p1_dir * shifting;
                                         jsonTee.Pt3 = pipe3.Startpoint;
                                         jsonTee.isValid = true;
                                     }
@@ -1459,6 +1457,7 @@ namespace JSON2IFC
                             }
                         }
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
+                        Console.WriteLine("Creating Pipes");
                         using (var txn = ifcStore.BeginTransaction("Create Pipes"))
                         {
                             //create pipes
@@ -1565,6 +1564,7 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
+                        Console.WriteLine("Creating Elbows");
                         using (var txn = ifcStore.BeginTransaction("Create Pipe Ellbows"))
                         {
                             //create pipe ellbows
@@ -1690,6 +1690,7 @@ namespace JSON2IFC
                             }
                             txn.Commit();
                         }
+                        Console.WriteLine("Creating Tees");
                         using (var txn = ifcStore.BeginTransaction("Create Pipe Tees"))
                         {
                             //create pipe Tees
@@ -1757,7 +1758,7 @@ namespace JSON2IFC
                                                                 }));
                                                             }));
                                                         });
-                                                        radius = z.pipe.Radius * UNIT_CONVERSION;
+                                                        radius = z.pipe.Radius * UNIT_CONVERSION * 1.1;
                                                         depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
                                                         locationJsonXYZ = z.pt * UNIT_CONVERSION;
                                                         axisJsonXYZ = (jsonTee.center - z.pt) * UNIT_CONVERSION;
