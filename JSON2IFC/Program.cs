@@ -39,7 +39,7 @@ namespace JSON2IFC
             string output_path = Path.Combine(di.FullName, "models");
             if (!Directory.Exists(output_path))
                 Directory.CreateDirectory(output_path);
-            GenerateIFC(TypeIFC.Structure, XbimSchemaVersion.Ifc4, output_path);
+            GenerateIFC(TypeIFC.Model, XbimSchemaVersion.Ifc4, output_path);
         }
         internal enum TypeIFC { Structure, MEP, Model };
         internal static class TypicalMaterial
@@ -241,54 +241,50 @@ namespace JSON2IFC
                                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                 shapeRepresentation.RepresentationType = "CSG";
                                                 shapeRepresentation.RepresentationIdentifier = "Body";
-                                                IfcBooleanResult ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(initialBooleanResult =>
+                                                IfcBooleanOperand ifcBooleanOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                 {
-                                                    initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
-                                                    initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
+                                                    extrudedAreaSolid.Depth = length;
+                                                    extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
                                                     {
-                                                        extrudedAreaSolid.Depth = length;
-                                                        extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
+                                                        rectangleProfileDef.XDim = width;
+                                                        rectangleProfileDef.YDim = thickness;
+                                                        rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                        rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
                                                         {
-                                                            rectangleProfileDef.XDim = width;
-                                                            rectangleProfileDef.YDim = thickness;
-                                                            rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
-                                                            rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                            axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                                {
-                                                                    cartesianPoint.SetXY(0, 0);
-                                                                });
+                                                                cartesianPoint.SetXY(0, 0);
                                                             });
                                                         });
-                                                        extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
-                                                        extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
-                                                        {
-                                                            axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                            {
-                                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
-                                                            });
-                                                            axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
-                                                            {
-                                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
-                                                            });
-                                                            axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
-                                                            {
-                                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
-                                                            });
-                                                        });
-                                                        ifcBeamRepresentations.Add(extrudedAreaSolid);
                                                     });
+                                                    extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                    extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                    {
+                                                        axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                        {
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
+                                                        });
+                                                    });
+                                                    ifcBeamRepresentations.Add(extrudedAreaSolid);
                                                 });
                                                 foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcColumnsRepresentation;
                                                     });
                                                 }
-                                                shapeRepresentation.Items.Add(ifcBooleanResult);
+                                                shapeRepresentation.Items.Add((IfcRepresentationItem)ifcBooleanOperand);
                                                 ifcPresentationLayerAssignment.AssignedItems.Add(shapeRepresentation);
                                             }));
                                         });
@@ -400,6 +396,7 @@ namespace JSON2IFC
                                 }
                             txn.Commit();
                         }
+
                         using (var txn = ifcStore.BeginTransaction("Create Walls"))
                         {
                             //create walls
@@ -658,8 +655,6 @@ namespace JSON2IFC
                                     jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).x, (jsonWall.endPoint - jsonWall.startPoint).y, (jsonWall.endPoint - jsonWall.startPoint).z) * UNIT_CONVERSION;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.x, jsonWall.location.y, jsonWall.location.z) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
-                                    Console.WriteLine(jsonWall.id);
-                                    Console.ReadKey();
                                     IfcWall ifcWall = ifcStore.Instances.New<IfcWall>(wall =>
                                     {
                                         wall.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:" + jsonWall.id.ToString();
@@ -670,82 +665,78 @@ namespace JSON2IFC
                                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                 shapeRepresentation.RepresentationType = "CSG";
                                                 shapeRepresentation.RepresentationIdentifier = "Body";
-                                                IfcBooleanResult ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(initialBooleanResult =>
+                                                IfcBooleanOperand ifcBooleanOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                 {
-                                                    initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
-                                                    initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
+                                                    extrudedAreaSolid.Depth = height;
+                                                    extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
                                                     {
-                                                        extrudedAreaSolid.Depth = height;
-                                                        extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
+                                                        rectangleProfileDef.XDim = length;
+                                                        rectangleProfileDef.YDim = width;
+                                                        rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                        rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
                                                         {
-                                                            rectangleProfileDef.XDim = length;
-                                                            rectangleProfileDef.YDim = width;
-                                                            rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
-                                                            rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                            axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                                {
-                                                                    cartesianPoint.SetXY(0, 0);
-                                                                });
+                                                                cartesianPoint.SetXY(0, 0);
                                                             });
                                                         });
-                                                        extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
-                                                        extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
-                                                        {
-                                                            axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                            {
-                                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
-                                                            });
-                                                            axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
-                                                            {
-                                                                direction.SetXYZ(0, 0, 1);
-                                                            });
-                                                            axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
-                                                            {
-                                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
-                                                            });
-                                                        });
-                                                        ifcWallRepresentations.Add(extrudedAreaSolid);
                                                     });
+                                                    extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                    extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                    {
+                                                        axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                        {
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(0, 0, 1);
+                                                        });
+                                                        axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
+                                                        });
+                                                    });
+                                                    ifcWallRepresentations.Add(extrudedAreaSolid);
                                                 });
                                                 foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcColumnsRepresentation;
                                                     });
                                                 }
                                                 foreach (IfcExtrudedAreaSolid ifcBeamRepresentation in ifcBeamRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcBeamRepresentation;
                                                     });
                                                 }
                                                 foreach (IfcExtrudedAreaSolid ifcWindowRepresentation in ifcWindowRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcWindowRepresentation;
                                                     });
                                                 }
                                                 foreach (IfcExtrudedAreaSolid ifcDoorRepresentation in ifcDoorRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcDoorRepresentation;
                                                     });
                                                 }
-                                                shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcStyledItem.Item = ifcBooleanResult;
+                                                shapeRepresentation.Items.Add((IfcRepresentationItem)ifcBooleanOperand);
+                                                ifcStyledItem.Item = ifcBooleanOperand as IfcBooleanResult;
                                             }));
                                         });
                                         wall.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -837,40 +828,6 @@ namespace JSON2IFC
                                         }));
                                     });
 
-                                    IfcExtrudedAreaSolid ifcExtrudedAreaSolid = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
-                                    {
-                                        extrudedAreaSolid.Depth = height;
-                                        extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
-                                        {
-                                            rectangleProfileDef.XDim = length;
-                                            rectangleProfileDef.YDim = width;
-                                            rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
-                                            rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
-                                            {
-                                                axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                {
-                                                    cartesianPoint.SetXY(0, 0);
-                                                });
-                                            });
-                                        });
-                                        extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
-                                        extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
-                                        {
-                                            axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                            {
-                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
-                                            });
-                                            axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
-                                            {
-                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
-                                            });
-                                            axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
-                                            {
-                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
-                                            });
-                                        });
-                                    });
-
                                     IfcWindow ifcWindow = ifcStore.Instances.New<IfcWindow>(window =>
                                     {
                                         window.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
@@ -880,31 +837,59 @@ namespace JSON2IFC
                                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                 shapeRepresentation.RepresentationType = "CSG";
                                                 shapeRepresentation.RepresentationIdentifier = "Body";
-                                                IfcBooleanResult ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(initialBooleanResult =>
+                                                IfcBooleanOperand ifcBooleanOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                 {
-                                                    initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
-                                                    initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcExtrudedAreaSolid;
+                                                    extrudedAreaSolid.Depth = height;
+                                                    extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
+                                                    {
+                                                        rectangleProfileDef.XDim = length;
+                                                        rectangleProfileDef.YDim = width;
+                                                        rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                        rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                        {
+                                                            axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                            {
+                                                                cartesianPoint.SetXY(0, 0);
+                                                            });
+                                                        });
+                                                    });
+                                                    extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                    extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                    {
+                                                        axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                        {
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
+                                                        });
+                                                    });
                                                 });
                                                 foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcColumnsRepresentation;
                                                     });
                                                 }
                                                 foreach (IfcExtrudedAreaSolid ifcBeamRepresentation in ifcBeamRepresentations)
                                                 {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
                                                     {
                                                         iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
+                                                        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
                                                         iterativeBooleanResult.SecondOperand = ifcBeamRepresentation;
                                                     });
                                                 }
-                                                shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcStyledItem.Item = ifcBooleanResult;
+                                                shapeRepresentation.Items.Add((IfcRepresentationItem)ifcBooleanOperand);
+                                                ifcStyledItem.Item = ifcBooleanOperand as IfcBooleanResult;
                                             }));
                                         });
                                         window.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -976,40 +961,6 @@ namespace JSON2IFC
                                         }));
                                     });
 
-                                    IfcExtrudedAreaSolid ifcExtrudedAreaSolid = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
-                                    {
-                                        extrudedAreaSolid.Depth = height;
-                                        extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
-                                        {
-                                            rectangleProfileDef.XDim = length;
-                                            rectangleProfileDef.YDim = width;
-                                            rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
-                                            rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
-                                            {
-                                                axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                                {
-                                                    cartesianPoint.SetXY(0, 0);
-                                                });
-                                            });
-                                        });
-                                        extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
-                                        extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
-                                        {
-                                            axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
-                                            {
-                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
-                                            });
-                                            axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
-                                            {
-                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
-                                            });
-                                            axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
-                                            {
-                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
-                                            });
-                                        });
-                                    });
-
                                     IfcDoor ifcDoor = ifcStore.Instances.New<IfcDoor>(door =>
                                     {
                                         door.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
@@ -1019,31 +970,59 @@ namespace JSON2IFC
                                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                                 shapeRepresentation.RepresentationType = "CSG";
                                                 shapeRepresentation.RepresentationIdentifier = "Body";
-                                                IfcBooleanResult ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(initialBooleanResult =>
+                                                IfcBooleanOperand ifcBooleanOperand = ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                 {
-                                                    initialBooleanResult.Operator = IfcBooleanOperator.INTERSECTION;
-                                                    initialBooleanResult.FirstOperand = initialBooleanResult.SecondOperand = ifcExtrudedAreaSolid;
+                                                    extrudedAreaSolid.Depth = height;
+                                                    extrudedAreaSolid.SweptArea = ifcStore.Instances.New<IfcRectangleProfileDef>(rectangleProfileDef =>
+                                                    {
+                                                        rectangleProfileDef.XDim = length;
+                                                        rectangleProfileDef.YDim = width;
+                                                        rectangleProfileDef.ProfileType = IfcProfileTypeEnum.AREA;
+                                                        rectangleProfileDef.Position = ifcStore.Instances.New<IfcAxis2Placement2D>(axis2Placement2D =>
+                                                        {
+                                                            axis2Placement2D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                            {
+                                                                cartesianPoint.SetXY(0, 0);
+                                                            });
+                                                        });
+                                                    });
+                                                    extrudedAreaSolid.ExtrudedDirection = ifcStore.Instances.New<IfcDirection>(direction => direction.SetXYZ(0, 0, 1));
+                                                    extrudedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
+                                                    {
+                                                        axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
+                                                        {
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
+                                                        });
+                                                        axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
+                                                        {
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
+                                                        });
+                                                    });
                                                 });
-                                                foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
-                                                {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
-                                                    {
-                                                        iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
-                                                        iterativeBooleanResult.SecondOperand = ifcColumnsRepresentation;
-                                                    });
-                                                }
-                                                foreach (IfcExtrudedAreaSolid ifcBeamRepresentation in ifcBeamRepresentations)
-                                                {
-                                                    ifcBooleanResult = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
-                                                    {
-                                                        iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
-                                                        iterativeBooleanResult.FirstOperand = ifcBooleanResult;
-                                                        iterativeBooleanResult.SecondOperand = ifcBeamRepresentation;
-                                                    });
-                                                }
-                                                shapeRepresentation.Items.Add(ifcBooleanResult);
-                                                ifcStyledItem.Item = ifcBooleanResult;
+                                                //foreach (IfcExtrudedAreaSolid ifcColumnsRepresentation in ifcColumnRepresentations)
+                                                //{
+                                                //    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                //    {
+                                                //        iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
+                                                //        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
+                                                //        iterativeBooleanResult.SecondOperand = ifcColumnsRepresentation;
+                                                //    });
+                                                //}
+                                                //foreach (IfcExtrudedAreaSolid ifcBeamRepresentation in ifcBeamRepresentations)
+                                                //{
+                                                //    ifcBooleanOperand = ifcStore.Instances.New<IfcBooleanResult>(iterativeBooleanResult =>
+                                                //    {
+                                                //        iterativeBooleanResult.Operator = IfcBooleanOperator.DIFFERENCE;
+                                                //        iterativeBooleanResult.FirstOperand = ifcBooleanOperand;
+                                                //        iterativeBooleanResult.SecondOperand = ifcBeamRepresentation;
+                                                //    });
+                                                //}
+                                                shapeRepresentation.Items.Add((IfcRepresentationItem)ifcBooleanOperand);
+                                                ifcStyledItem.Item = ifcBooleanOperand as IfcBooleanResult;
                                             }));
                                         });
                                         door.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -1484,13 +1463,15 @@ namespace JSON2IFC
                                         error_msg += "ERROR: Creating Pipe but the pipe is too short: #" + jsonPipe.ID.ToString() + "\n";
                                         continue;
                                     }
+
                                     double length = jsonPipe.length * UNIT_CONVERSION;
                                     double radius = jsonPipe.Radius * UNIT_CONVERSION;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.x, jsonPipe.Startpoint.y, jsonPipe.Startpoint.z) * UNIT_CONVERSION;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).x, (jsonPipe.Endpoint - jsonPipe.Startpoint).y, (jsonPipe.Endpoint - jsonPipe.Startpoint).z) * UNIT_CONVERSION;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION;
-
+                                    jsonXYZ refDirJsonXYZ = !(axisJsonXYZ.x == 0 && axisJsonXYZ.y == 0) ? (new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION) : (new jsonXYZ(axisJsonXYZ.z, 0, -axisJsonXYZ.x) * UNIT_CONVERSION);
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    Console.WriteLine(refDirJsonXYZ.ToString());
+                                    if (refDirJsonXYZ.distanceTo(jsonXYZ.Zero) == 0) Console.ReadLine();
                                     //showcase appearance
                                     IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
                                     {
@@ -1769,7 +1750,7 @@ namespace JSON2IFC
                                                         depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
                                                         locationJsonXYZ = z.pt * UNIT_CONVERSION;
                                                         axisJsonXYZ = (jsonTee.center - z.pt) * UNIT_CONVERSION;
-                                                        refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION;
+                                                        refDirJsonXYZ = !(axisJsonXYZ.x == 0 && axisJsonXYZ.y == 0) ? (new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION) : (new jsonXYZ(axisJsonXYZ.z, 0, axisJsonXYZ.x) * UNIT_CONVERSION);
                                                         shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                         {
                                                             extrudedAreaSolid.Depth = depth;
