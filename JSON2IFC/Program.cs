@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+//using Newtonsoft.Json;
 using Xbim.Common;
 using Xbim.Common.Step21;
 using Xbim.Ifc;
@@ -62,7 +64,7 @@ namespace JSON2IFC
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonStructure jo = JsonConvert.DeserializeObject<jsonStructure>(jsonText);
+            jsonStructure jo = JsonSerializer.Deserialize<jsonStructure>(jsonText);
             return jo;
         }
         static jsonMEP readJSONMEP()
@@ -74,7 +76,11 @@ namespace JSON2IFC
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonMEP jo = JsonConvert.DeserializeObject<jsonMEP>(jsonText);
+            jsonMEP jo = JsonSerializer.Deserialize<jsonMEP>(jsonText, new JsonSerializerOptions
+            {
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                PropertyNameCaseInsensitive = true,
+            });
             return jo;
         }
         static void GenerateIFC(TypeIFC type, XbimSchemaVersion release, string path)
@@ -86,7 +92,7 @@ namespace JSON2IFC
                 {
                     IfcBuilding ifcBuilding = createBuilding(ifcStore, "Building");
                     IfcBuildingStorey ifcBuildingStorey = createStorey(ifcBuilding);
-                    if (type == TypeIFC.MEP || type == TypeIFC.Model)
+                    if (type == TypeIFC.Structure || type == TypeIFC.Model)
                     {
                         jsonStructure js = readJSONStructure();
                         List<IfcExtrudedAreaSolid> ifcColumnRepresentations = new List<IfcExtrudedAreaSolid>();
@@ -116,7 +122,7 @@ namespace JSON2IFC
                                     double width = jsonColumn.width * 1000;
                                     double height = jsonColumn.height * 1000;
                                     jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.RotationalAngleInRadius) * 1000;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.LocationPoint.X, jsonColumn.LocationPoint.Y, jsonColumn.LocationPoint.Z) * 1000;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.LocationPoint.x, jsonColumn.LocationPoint.y, jsonColumn.LocationPoint.z) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
                                     IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
@@ -174,7 +180,7 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
@@ -182,7 +188,7 @@ namespace JSON2IFC
                                                         });
                                                         axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                         });
                                                     });
                                                     ifcColumnRepresentations.Add(extrudedAreaSolid);
@@ -223,7 +229,7 @@ namespace JSON2IFC
                                     double thickness = jsonBeam.thickness * 1000;
                                     jsonXYZ refDirJsonXYZ = (jsonBeam.endPoint - jsonBeam.startPoint).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), Math.PI / 2) * 1000;
                                     jsonXYZ locationJsonXYZ = jsonBeam.startPoint * 1000;
-                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonBeam.endPoint - jsonBeam.startPoint).X, (jsonBeam.endPoint - jsonBeam.startPoint).Y, (jsonBeam.endPoint - jsonBeam.startPoint).Z) * 1000;
+                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonBeam.endPoint - jsonBeam.startPoint).x, (jsonBeam.endPoint - jsonBeam.startPoint).y, (jsonBeam.endPoint - jsonBeam.startPoint).z) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
 
                                     IfcBeam ifcBeam = ifcStore.Instances.New<IfcBeam>(beam =>
@@ -259,15 +265,15 @@ namespace JSON2IFC
                                                         {
                                                             axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                             });
                                                             axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                             });
                                                             axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                             });
                                                         });
                                                         ifcBeamRepresentations.Add(extrudedAreaSolid);
@@ -306,7 +312,7 @@ namespace JSON2IFC
                                         double height = jsonWindow.height * 1000;
 
                                         jsonXYZ refDirJsonXYZ = (jsonWindow.endPoint - jsonWindow.startPoint) * 1000;
-                                        jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.X, jsonWindow.location.Y, jsonWindow.location.Z) * 1000;
+                                        jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.x, jsonWindow.location.y, jsonWindow.location.z) * 1000;
                                         jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                         //axis: extrude dir/Z dir; refDirection: width dir/X dir
 
@@ -331,15 +337,15 @@ namespace JSON2IFC
                                             {
                                                 axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                 {
-                                                    cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                    cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                 });
                                                 axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                 {
-                                                    direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                    direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                 });
                                                 axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                 {
-                                                    direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                    direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                 });
                                             });
                                             ifcWindowRepresentations.Add(extrudedAreaSolid);
@@ -352,7 +358,7 @@ namespace JSON2IFC
                                         double height = jsonDoor.height * UNIT_CONVERSION;
 
                                         jsonXYZ refDirJsonXYZ = (jsonDoor.endPoint - jsonDoor.startPoint) * 1000;
-                                        jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.X, jsonDoor.location.Y, jsonDoor.location.Z) * 1000;
+                                        jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.x, jsonDoor.location.y, jsonDoor.location.z) * 1000;
                                         jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                         //axis: extrude dir/Z dir; refDirection: width dir/X dir
 
@@ -377,15 +383,15 @@ namespace JSON2IFC
                                             {
                                                 axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                 {
-                                                    cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                    cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                 });
                                                 axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                 {
-                                                    direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                    direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                 });
                                                 axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                 {
-                                                    direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                    direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                 });
                                             });
                                             ifcDoorRepresentations.Add(extrudedAreaSolid);
@@ -649,9 +655,8 @@ namespace JSON2IFC
                                     double length = jsonWall.length * UNIT_CONVERSION;
                                     double width = jsonWall.width * UNIT_CONVERSION;
                                     double height = jsonWall.height * UNIT_CONVERSION;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).X, (jsonWall.endPoint - jsonWall.startPoint).Y, (jsonWall.endPoint - jsonWall.startPoint).Z) * UNIT_CONVERSION;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.X, jsonWall.location.Y, jsonWall.location.Z) * UNIT_CONVERSION;
-
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).x, (jsonWall.endPoint - jsonWall.startPoint).y, (jsonWall.endPoint - jsonWall.startPoint).z) * UNIT_CONVERSION;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.x, jsonWall.location.y, jsonWall.location.z) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     IfcWall ifcWall = ifcStore.Instances.New<IfcWall>(wall =>
                                     {
@@ -687,7 +692,7 @@ namespace JSON2IFC
                                                         {
                                                             axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                             });
                                                             axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
@@ -695,7 +700,7 @@ namespace JSON2IFC
                                                             });
                                                             axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                             });
                                                         });
                                                         ifcWallRepresentations.Add(extrudedAreaSolid);
@@ -801,7 +806,7 @@ namespace JSON2IFC
                                     double height = jsonWindow.height * 1000;
 
                                     jsonXYZ refDirJsonXYZ = (jsonWindow.endPoint - jsonWindow.startPoint) * 1000;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.X, jsonWindow.location.Y, jsonWindow.location.Z) * 1000;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.x, jsonWindow.location.y, jsonWindow.location.z) * 1000;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
@@ -851,15 +856,15 @@ namespace JSON2IFC
                                         {
                                             axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                             {
-                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                             });
                                             axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                             {
-                                                direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                             });
                                             axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                             {
-                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                             });
                                         });
                                     });
@@ -940,7 +945,7 @@ namespace JSON2IFC
                                     double height = jsonDoor.height * 1000;
 
                                     jsonXYZ refDirJsonXYZ = (jsonDoor.endPoint - jsonDoor.startPoint) * 1000;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.X, jsonDoor.location.Y, jsonDoor.location.Z) * 1000;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.x, jsonDoor.location.y, jsonDoor.location.z) * 1000;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
@@ -990,15 +995,15 @@ namespace JSON2IFC
                                         {
                                             axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                             {
-                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                             });
                                             axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                             {
-                                                direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                             });
                                             axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                             {
-                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                             });
                                         });
                                     });
@@ -1141,7 +1146,7 @@ namespace JSON2IFC
                                                             {
                                                                 points.Add(ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                                 {
-                                                                    cartesianPoint.SetXY(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION);
+                                                                    cartesianPoint.SetXY(jsonXYZ.x * UNIT_CONVERSION, jsonXYZ.y * UNIT_CONVERSION);
                                                                 }));
                                                             }
                                                             polyline.Points.AddRange(points);
@@ -1154,15 +1159,15 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                         });
                                                     });
                                                     ifcSlabRepresentations.Add(extrudedAreaSolid);
@@ -1228,7 +1233,7 @@ namespace JSON2IFC
                                                             {
                                                                 points.Add(ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                                 {
-                                                                    cartesianPoint.SetXY(jsonXYZ.X * UNIT_CONVERSION, jsonXYZ.Y * UNIT_CONVERSION);
+                                                                    cartesianPoint.SetXY(jsonXYZ.x * UNIT_CONVERSION, jsonXYZ.y * UNIT_CONVERSION);
                                                                 }));
                                                             }
                                                             polyline.Points.AddRange(points);
@@ -1241,15 +1246,15 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z + (js.Wall[0].height + jsonSlab.thickness * 2) * UNIT_CONVERSION);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z + (js.Wall[0].height + jsonSlab.thickness * 2) * UNIT_CONVERSION);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                         });
                                                     });
                                                     ifcSlabRepresentations.Add(extrudedAreaSolid);
@@ -1301,7 +1306,6 @@ namespace JSON2IFC
                             double average_radius, angle, shifting;
                             foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction)
                             {
-
                                 pipe1 = pipes.Find(x => x.ID.Equals(jsonFitting.Pipe_Index_1));
                                 pipe2 = pipes.Find(x => x.ID.Equals(jsonFitting.Pipe_Index_2));
                                 if (pipe1 != null && pipe2 != null && pipe1.length != 0 && pipe2.length != 0)
@@ -1480,9 +1484,10 @@ namespace JSON2IFC
                                     }
                                     double length = jsonPipe.length * UNIT_CONVERSION;
                                     double radius = jsonPipe.Radius * UNIT_CONVERSION;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.X, jsonPipe.Startpoint.Y, jsonPipe.Startpoint.Z) * UNIT_CONVERSION;
-                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).X, (jsonPipe.Endpoint - jsonPipe.Startpoint).Y, (jsonPipe.Endpoint - jsonPipe.Startpoint).Z) * UNIT_CONVERSION;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * UNIT_CONVERSION;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.Startpoint.x, jsonPipe.Startpoint.y, jsonPipe.Startpoint.z) * UNIT_CONVERSION;
+                                    jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.Endpoint - jsonPipe.Startpoint).x, (jsonPipe.Endpoint - jsonPipe.Startpoint).y, (jsonPipe.Endpoint - jsonPipe.Startpoint).z) * UNIT_CONVERSION;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION;
+
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
                                     IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
@@ -1540,15 +1545,15 @@ namespace JSON2IFC
                                                     {
                                                         axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                         {
-                                                            cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                            cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                            direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                         });
                                                         axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                         {
-                                                            direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                            direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                         });
                                                     });
                                                     ifcPipeRepresentations.Add(extrudedAreaSolid);
@@ -1593,7 +1598,7 @@ namespace JSON2IFC
                                         jsonXYZ locationJsonXYZ = jsonFitting.location * UNIT_CONVERSION;
                                         jsonXYZ axisJsonXYZ = jsonFitting.refAxis * UNIT_CONVERSION;
                                         jsonXYZ refDirJsonXYZ = (jsonFitting.center - jsonFitting.location) * UNIT_CONVERSION;
-                                        if (radius > rotationCenter.X)
+                                        if (radius > rotationCenter.x)
                                         {
                                             error_msg += "WARNING: Creating Ellbow but the pipe is too short for revolving\n";
                                             continue;
@@ -1654,26 +1659,26 @@ namespace JSON2IFC
                                                         {
                                                             axis1Placement.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(rotationAxis.X, rotationAxis.Y, rotationAxis.Z);
+                                                                direction.SetXYZ(rotationAxis.x, rotationAxis.y, rotationAxis.z);
                                                             });
                                                             axis1Placement.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                cartesianPoint.SetXYZ(rotationCenter.X, rotationCenter.Y, rotationCenter.Z);
+                                                                cartesianPoint.SetXYZ(rotationCenter.x, rotationCenter.y, rotationCenter.z);
                                                             });
                                                         });
                                                         revolvedAreaSolid.Position = ifcStore.Instances.New<IfcAxis2Placement3D>(axis2Placement3D =>
                                                         {
                                                             axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                             {
-                                                                cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                                cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                             });
                                                             axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                                direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                             });
                                                             axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                             {
-                                                                direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                                direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                             });
                                                         });
                                                         ifcEllbowRepresentations.Add(revolvedAreaSolid);
@@ -1762,7 +1767,7 @@ namespace JSON2IFC
                                                         depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
                                                         locationJsonXYZ = z.pt * UNIT_CONVERSION;
                                                         axisJsonXYZ = (jsonTee.center - z.pt) * UNIT_CONVERSION;
-                                                        refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.Y, -axisJsonXYZ.X, 0) * UNIT_CONVERSION;
+                                                        refDirJsonXYZ = new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION;
                                                         shapeRepresentation.Items.Add(ifcStore.Instances.New<IfcExtrudedAreaSolid>(extrudedAreaSolid =>
                                                         {
                                                             extrudedAreaSolid.Depth = depth;
@@ -1784,15 +1789,15 @@ namespace JSON2IFC
                                                             {
                                                                 axis2Placement3D.Location = ifcStore.Instances.New<IfcCartesianPoint>(cartesianPoint =>
                                                                 {
-                                                                    cartesianPoint.SetXYZ(locationJsonXYZ.X, locationJsonXYZ.Y, locationJsonXYZ.Z);
+                                                                    cartesianPoint.SetXYZ(locationJsonXYZ.x, locationJsonXYZ.y, locationJsonXYZ.z);
                                                                 });
                                                                 axis2Placement3D.Axis = ifcStore.Instances.New<IfcDirection>(direction =>
                                                                 {
-                                                                    direction.SetXYZ(axisJsonXYZ.X, axisJsonXYZ.Y, axisJsonXYZ.Z);
+                                                                    direction.SetXYZ(axisJsonXYZ.x, axisJsonXYZ.y, axisJsonXYZ.z);
                                                                 });
                                                                 axis2Placement3D.RefDirection = ifcStore.Instances.New<IfcDirection>(direction =>
                                                                 {
-                                                                    direction.SetXYZ(refDirJsonXYZ.X, refDirJsonXYZ.Y, refDirJsonXYZ.Z);
+                                                                    direction.SetXYZ(refDirJsonXYZ.x, refDirJsonXYZ.y, refDirJsonXYZ.z);
                                                                 });
                                                             });
                                                             ifcTFittingRepresentations.Add(extrudedAreaSolid);
@@ -2059,18 +2064,20 @@ namespace JSON2IFC
             public static jsonXYZ YBasis => new jsonXYZ(0, 1, 0);
             public static jsonXYZ ZBasis => new jsonXYZ(0, 0, 1);
             public static jsonXYZ Zero => new jsonXYZ(0, 0, 0);
-            public double X { get; set; }
-            public double Y { get; set; }
-            public double Z { get; set; }
+            public double x { get; set; }
+            public double y { get; set; }
+            public double z { get; set; }
             public jsonXYZ(double x, double y, double z)
             {
-                this.X = x;
-                this.Y = y;
-                this.Z = z;
+                this.x = x;
+                this.y = y;
+                this.z = z;
+            }
+            public jsonXYZ() {
             }
             public jsonXYZ crossProduct(jsonXYZ pt)
             {
-                return new jsonXYZ(this.Y * pt.Z - this.Z * pt.Y, -(this.X * pt.Z - this.Z * pt.X), this.X * pt.Y - this.Y * pt.X);
+                return new jsonXYZ(this.y * pt.z - this.z * pt.y, -(this.x * pt.z - this.z * pt.x), this.x * pt.y - this.y * pt.x);
             }
             public double angleTo(jsonXYZ dir)
             {
@@ -2082,44 +2089,44 @@ namespace JSON2IFC
             }
             public bool coincide(jsonXYZ obj)
             {
-                return (this.X == obj.X && this.Y == obj.Y && this.Z == obj.Z);
+                return (this.x == obj.x && this.y == obj.y && this.z == obj.z);
             }
             public override string ToString()
             {
-                return "jsonXYZ(" + this.X.ToString() + ", " + this.Y.ToString() + ", " + this.Z.ToString() + ")";
+                return "jsonXYZ(" + this.x.ToString() + ", " + this.y.ToString() + ", " + this.z.ToString() + ")";
             }
             public double distanceTo(jsonXYZ p)
             {
-                double d = Math.Sqrt(Math.Pow(this.X - p.X, 2) + Math.Pow(this.Y - p.Y, 2) + Math.Pow(this.Z - p.Z, 2));
+                double d = Math.Sqrt(Math.Pow(this.x - p.x, 2) + Math.Pow(this.y - p.y, 2) + Math.Pow(this.z - p.z, 2));
                 return d;
             }
             public double dotProduct(jsonXYZ p)
             {
-                return this.X * p.X + this.Y * p.Y + this.Z * p.Z;
+                return this.x * p.x + this.y * p.y + this.z * p.z;
             }
             public static jsonXYZ operator -(jsonXYZ left, jsonXYZ right)
             {
-                return new jsonXYZ(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+                return new jsonXYZ(left.x - right.x, left.y - right.y, left.z - right.z);
             }
             public static jsonXYZ operator -(jsonXYZ s)
             {
-                return new jsonXYZ(-s.X, -s.Y, -s.Z);
+                return new jsonXYZ(-s.x, -s.y, -s.z);
             }
             public static jsonXYZ operator /(jsonXYZ s, double d)
             {
-                return new jsonXYZ(s.X / d, s.Y / d, s.Z / d);
+                return new jsonXYZ(s.x / d, s.y / d, s.z / d);
             }
             public static jsonXYZ operator +(jsonXYZ left, jsonXYZ right)
             {
-                return new jsonXYZ(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+                return new jsonXYZ(left.x + right.x, left.y + right.y, left.z + right.z);
             }
             public static jsonXYZ operator *(jsonXYZ left, double d)
             {
-                return new jsonXYZ(left.X * d, left.Y * d, left.Z * d);
+                return new jsonXYZ(left.x * d, left.y * d, left.z * d);
             }
             public static jsonXYZ operator *(double d, jsonXYZ right)
             {
-                return new jsonXYZ(right.X * d, right.Y * d, right.Z * d);
+                return new jsonXYZ(right.x * d, right.y * d, right.z * d);
             }
             public double distanceTo2Points(jsonXYZ p1, jsonXYZ p2)
             {
@@ -2148,15 +2155,15 @@ namespace JSON2IFC
                 jsonXYZ new_pt = this - pt;
                 double c = Math.Cos(angle);
                 double s = Math.Sin(angle);
-                double vx = axis.normalized().X;
-                double vy = axis.normalized().Y;
-                double vz = axis.normalized().Z;
+                double vx = axis.normalized().x;
+                double vy = axis.normalized().y;
+                double vz = axis.normalized().z;
 
-                double new_x = (vx * vx * (1 - c) + c) * new_pt.X + (vx * vy * (1 - c) - vz * s) * new_pt.Y + (vx * vz * (1 - c) + vy * s) * new_pt.Z;
+                double new_x = (vx * vx * (1 - c) + c) * new_pt.x + (vx * vy * (1 - c) - vz * s) * new_pt.y + (vx * vz * (1 - c) + vy * s) * new_pt.z;
 
-                double new_y = (vy * vx * (1 - c) + vz * s) * new_pt.X + (vy * vy * (1 - c) + c) * new_pt.Y + (vy * vz * (1 - c) - vx * s) * new_pt.Z;
+                double new_y = (vy * vx * (1 - c) + vz * s) * new_pt.x + (vy * vy * (1 - c) + c) * new_pt.y + (vy * vz * (1 - c) - vx * s) * new_pt.z;
 
-                double new_z = (vx * vz * (1 - c) - vy * s) * new_pt.X + (vy * vz * (1 - c) + vx * s) * new_pt.Y + (vz * vz * (1 - c) + c) * new_pt.Z;
+                double new_z = (vx * vz * (1 - c) - vy * s) * new_pt.x + (vy * vz * (1 - c) + vx * s) * new_pt.y + (vz * vz * (1 - c) + c) * new_pt.z;
 
                 new_pt = new jsonXYZ(new_x, new_y, new_z);
                 new_pt = new_pt + pt;
