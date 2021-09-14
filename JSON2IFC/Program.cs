@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-//using Newtonsoft.Json;
+
 using Xbim.Common;
 using Xbim.Common.Step21;
 using Xbim.Ifc;
@@ -39,7 +39,7 @@ namespace JSON2IFC
             string output_path = Path.Combine(di.FullName, "models");
             if (!Directory.Exists(output_path))
                 Directory.CreateDirectory(output_path);
-            GenerateIFC(TypeIFC.Model, XbimSchemaVersion.Ifc4, output_path);
+            GenerateIFC(TypeIFC.Structure, XbimSchemaVersion.Ifc4, output_path);
         }
         internal enum TypeIFC { Structure, MEP, Model };
         internal static class TypicalMaterial
@@ -658,9 +658,11 @@ namespace JSON2IFC
                                     jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).x, (jsonWall.endPoint - jsonWall.startPoint).y, (jsonWall.endPoint - jsonWall.startPoint).z) * UNIT_CONVERSION;
                                     jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.x, jsonWall.location.y, jsonWall.location.z) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
+                                    Console.WriteLine(jsonWall.id);
+                                    Console.ReadKey();
                                     IfcWall ifcWall = ifcStore.Instances.New<IfcWall>(wall =>
                                     {
-                                        wall.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:" + jsonWall.ID.ToString();
+                                        wall.Name = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:" + jsonWall.id.ToString();
                                         wall.Representation = ifcStore.Instances.New<IfcProductDefinitionShape>(productDefinitionShape =>
                                         {
                                             productDefinitionShape.Representations.Add(ifcStore.Instances.New<IfcShapeRepresentation>(shapeRepresentation =>
@@ -748,7 +750,7 @@ namespace JSON2IFC
                                         });
                                         wall.ObjectPlacement = ifcBuilding.ObjectPlacement;
                                         wall.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
-                                        wall.Tag = jsonWall.ID.ToString();
+                                        wall.Tag = jsonWall.id.ToString();
                                         wall.ObjectType = "Basic Wall:Wall-Ext_102Bwk-75Ins-100LBlk-12P:654321";
                                     });
                                     ifcRelDefinesByType.RelatedObjects.Add(ifcWall);
@@ -2014,7 +2016,8 @@ namespace JSON2IFC
             public jsonXYZ startPoint { get; set; }
             public double height { get; set; }
             public double width { get; set; }
-            public int ID { get; set; }
+            public int id
+            { get; set; }
             public WallConnection[] Connections { get; set; }
             public jsonHole[] HoleList { get; set; }
             public jsonXYZ location
