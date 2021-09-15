@@ -18,7 +18,7 @@ namespace JSON2IFC
             string outputPath = Path.Combine(di.FullName, "models");
             if (!Directory.Exists(outputPath))
                 Directory.CreateDirectory(outputPath);
-            string outputIfcPath = Path.Combine(outputPath, "Model " + version.ToString().ToUpper() + ".ifc");
+            string outputIfcPath = Path.Combine(outputPath, "Model_" + version.ToString() + $"_{DateTime.Now.ToString("ddMMyyyy")}.ifc");
             string outputErrorPath = outputPath;
             Json2IfcHelper.GenerateIFC(version, outputIfcPath, structureJsonPath, mepJsonPath);
             Json2IfcHelper.WriteError(Json2IfcHelper.error_msg, outputErrorPath);
