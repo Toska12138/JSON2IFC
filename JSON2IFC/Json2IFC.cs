@@ -53,7 +53,9 @@ namespace JSON2IFC
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonStructure jo = JsonSerializer.Deserialize<jsonStructure>(jsonText);
+            jsonStructure jo = JsonSerializer.Deserialize<jsonStructure>(jsonText, new JsonSerializerOptions
+            {
+            });
             return jo;
         }
         static jsonMEP readJSONMEP(string strReadFilePath)
@@ -108,8 +110,8 @@ namespace JSON2IFC
                                     double length = jsonColumn.length * 1000;
                                     double width = jsonColumn.width * 1000;
                                     double height = jsonColumn.height * 1000;
-                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.RotationalAngleInRadius) * 1000;
-                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.LocationPoint.x, jsonColumn.LocationPoint.y, jsonColumn.LocationPoint.z) * 1000;
+                                    jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.rotationalAngleInRadius) * 1000;
+                                    jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.locationPoint.x, jsonColumn.locationPoint.y, jsonColumn.locationPoint.z) * 1000;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
                                     //showcase appearance
                                     IfcStyledItem ifcStyledItem = ifcStore.Instances.New<IfcStyledItem>(styledItem =>
@@ -1949,11 +1951,11 @@ namespace JSON2IFC
         public class jsonColumn
         {
             public double height { get; set; }
-            public jsonXYZ LocationPoint { get; set; }
-            public double RotationalAngleInRadius { get; set; }
+            public jsonXYZ locationPoint { get; set; }
+            public double rotationalAngleInRadius { get; set; }
             public double length { get; set; }
             public double width { get; set; }
-            public int ID { get; set; }
+            public int id { get; set; }
         }
         public class jsonDoor
         {
