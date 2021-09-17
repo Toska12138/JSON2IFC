@@ -215,7 +215,13 @@ namespace JSON2IFC
                                 {
                                     double length = jsonBeam.length * 1000;
                                     double width = jsonBeam.width * 1000;
-                                    double thickness = jsonBeam.thickness * 1000;
+                                    double thickness = jsonBeam.height * 1000;
+                                    if(length == 0 || width == 0|| thickness == 0)
+                                    {
+                                        Console.WriteLine("Empty Beam: length = " + length + ", width = " + width + ", thickness = " + thickness);
+                                        Console.ReadLine();
+                                        continue;
+                                    }
                                     jsonXYZ refDirJsonXYZ = (jsonBeam.endPoint - jsonBeam.startPoint).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), Math.PI / 2) * 1000;
                                     jsonXYZ locationJsonXYZ = jsonBeam.startPoint * 1000;
                                     jsonXYZ axisJsonXYZ = new jsonXYZ((jsonBeam.endPoint - jsonBeam.startPoint).x, (jsonBeam.endPoint - jsonBeam.startPoint).y, (jsonBeam.endPoint - jsonBeam.startPoint).z) * 1000;
@@ -1794,6 +1800,7 @@ namespace JSON2IFC
                             txn.Commit();
                         }
                     }
+                    Console.WriteLine(error_msg);
                     ifcStore.SaveAs(outputIfcFilePath, StorageType.Ifc);
                 }
             }
@@ -1925,27 +1932,23 @@ namespace JSON2IFC
         {
             public jsonXYZ[] baseProfile { get; set; }
             public double heightOfBottomFace { get; set; }
-            public double thickness { get; set; }
-            public double width
-            {
-                get { return Math.Min(this.baseProfile[0].distanceTo(this.baseProfile[1]), this.baseProfile[0].distanceTo(this.baseProfile[3])); }
-                set { }
-            }
-            public int ID { get; set; }
+            public double height { get; set; }
+            public double width { get; set; }
+            public int id { get; set; }
             public jsonXYZ startPoint
             {
                 get
                 {
-                    return (this.baseProfile[1].distanceTo(this.baseProfile[0]) == this.width ? (this.baseProfile[0] + this.baseProfile[1]) / 2 : (this.baseProfile[1] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.thickness / 2);
+                    return (this.baseProfile[1].distanceTo(this.baseProfile[0]) <= this.baseProfile[1].distanceTo(this.baseProfile[2]) ? (this.baseProfile[0] + this.baseProfile[1]) / 2 : (this.baseProfile[1] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.height / 2);
                 }
                 set { }
             }
             public jsonXYZ endPoint
             {
-                get { return (this.baseProfile[3].distanceTo(this.baseProfile[0]) == this.width ? (this.baseProfile[0] + this.baseProfile[3]) / 2 : (this.baseProfile[3] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.thickness / 2); }
+                get { return (this.baseProfile[3].distanceTo(this.baseProfile[0]) <= this.baseProfile[3].distanceTo(this.baseProfile[2]) ? (this.baseProfile[0] + this.baseProfile[3]) / 2 : (this.baseProfile[3] + this.baseProfile[2]) / 2) + new jsonXYZ(0, 0, this.heightOfBottomFace + this.height / 2); }
                 set { }
             }
-            public double length { get { return this.startPoint.distanceTo(this.endPoint); } set { } }
+            public double length { get; set; }
             public jsonHole[] HoleList { get; set; }
         }
         public class jsonColumn
