@@ -191,8 +191,11 @@ namespace JSON2IFC
                         //        }
                         //    txn.Commit();
                         //}
-
-                        Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> properties = dataReader.readProperties(propertiesPath);
+                        Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> properties = PropertyAgent.defaultProperties;
+                        if (string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
+                        {
+                            properties = dataReader.readProperties(propertiesPath);
+                        }
 
                         using (var txn = ifcStore.BeginTransaction("Create Walls"))
                         {

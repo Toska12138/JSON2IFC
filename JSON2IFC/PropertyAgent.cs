@@ -41,6 +41,11 @@ namespace JSON2IFC
         {
             this.ifcStore = ifcstore;
         }
+        public static Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> defaultProperties = new Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>>
+        {
+            { "IfcWallType", null },
+            { "IfcWall", null }
+        };
         public IfcPropertySet generateSet(string Name, Dictionary<string, Dictionary<string, string>> values)
         {
             return ifcStore.Instances.New<IfcPropertySet>(propertySet =>
@@ -57,7 +62,7 @@ namespace JSON2IFC
         }
         public void defineProperties(IfcProduct ifcProduct, Dictionary<string, Dictionary<string, Dictionary<string, string>>> properties)
         {
-            properties.Select(props => generateSet(props.Key, props.Value)).ToList().ForEach(props => 
+            if(properties != null) properties.Select(props => generateSet(props.Key, props.Value)).ToList().ForEach(props =>
             {
                 ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
                 {

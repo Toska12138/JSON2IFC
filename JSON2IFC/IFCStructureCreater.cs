@@ -302,7 +302,7 @@ namespace JSON2IFC
             PropertyAgent propertyAgent = new PropertyAgent(ifcStore);
             return ifcStore.Instances.New<IfcWallType>(wallType =>
             {
-                wallType.HasPropertySets.AddRange(properties.Select(props => propertyAgent.generateSet(props.Key, props.Value)));
+                if(properties != null) wallType.HasPropertySets.AddRange(properties.Select(props => propertyAgent.generateSet(props.Key, props.Value)));
                 wallType.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
             });
         }
