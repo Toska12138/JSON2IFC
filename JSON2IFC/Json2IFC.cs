@@ -30,6 +30,7 @@ using Xbim.IO;
 using static JSON2IFC.Material;
 using static JSON2IFC.SJSONPlugin;
 using static JSON2IFC.IFCStructureCreater;
+using Xbim.Ifc4.UtilityResource;
 
 namespace JSON2IFC
 {
@@ -37,7 +38,7 @@ namespace JSON2IFC
     {
         public static string error_msg;
         public const double UNIT_CONVERSION = 1000;
-        public static Result GenerateIFC(XbimSchemaVersion release, string outputIfcFilePath, string structureFilePath, string mepFilePath, string ductFilePath, string beamFilePath, string propertiesPath, string appearancePath)
+        public static Result GenerateIFC(XbimSchemaVersion release, string outputIfcFilePath, string structureFilePath, string mepFilePath, string ductFilePath, string beamFilePath, string propertiesPath, string appearancePath, string metaDataFilePath)
         {
             if(!string.IsNullOrEmpty(appearancePath) && File.Exists(appearancePath))
             {
@@ -47,6 +48,7 @@ namespace JSON2IFC
             Result res = new Result(0);
             DataReader dataReader = new DataReader();
             DataWriter dataWriter = new DataWriter();
+            TemplateBuilder templateBuilder = new TemplateBuilder();
             using (var ifcStore = createandInitModel("Model"))
             {
                 if (ifcStore != null)
@@ -242,10 +244,8 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDoors);
                         ifcProducts.AddRange(ifcWindows);
                         ifcProducts.AddRange(ifcSlabs);
-
-                        TemplateBuilder templateBuilder = new TemplateBuilder();
                         templateBuilder.addObject(ifcProducts);
-                        dataWriter.writeJson(templateBuilder.metaObjects, outputIfcFilePath);
+
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
 
@@ -326,9 +326,9 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcFlowSegments.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipeEllbows.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipeTFittings.ConvertAll(e => (IfcProduct)e));
-                        ifcProducts.AddRange(ifcPipeEllbows.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_S_Traps.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_P_Traps.ConvertAll(e => (IfcProduct)e));
+                        templateBuilder.addObject(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
@@ -369,6 +369,7 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDuctSegments);
                         ifcProducts.AddRange(ifcDuctEllbows);
                         ifcProducts.AddRange(ifcDuctTFitting);
+                        templateBuilder.addObject(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
@@ -380,11 +381,12 @@ namespace JSON2IFC
                             txn.Commit();
                         }
                     }
+
+                    dataWriter.writeIfc(ifcStore, outputIfcFilePath);
+                    dataWriter.writeJson(templateBuilder.metaObjects, outputIfcFilePath);
+                    if (error_msg != null) dataWriter.WriteError(error_msg, outputIfcFilePath);
                     Console.WriteLine("Press any key to continue...");
                     Console.ReadLine();
-
-                    dataWriter.writerIfc(ifcStore, outputIfcFilePath);
-                    if (error_msg != null) dataWriter.WriteError(error_msg, outputIfcFilePath);
                     return res;
                 }
             }
@@ -460,7 +462,6 @@ namespace JSON2IFC
             }
             return storey;
         }
-        //Structure
         public class Result
         {
             public int noElements { set; get; }
@@ -468,6 +469,9 @@ namespace JSON2IFC
             {
                 this.noElements = n;
             }
-        } 
+        }
+        public class Generic<T>
+        {
+        }
     }
 }

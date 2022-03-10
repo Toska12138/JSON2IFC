@@ -52,10 +52,12 @@ namespace JSON2IFC
         public const double UNIT_CONVERSION = 1000;
         public IfcStore ifcStore { get; }
         public IfcBuilding ifcBuilding { get; }
+        public Random random { get; set; }
         public IFCElementCreater(IfcStore ifcStore, IfcBuilding ifcBuilding)
         {
             this.ifcStore = ifcStore;
             this.ifcBuilding = ifcBuilding;
+            this.random = new Random(0);
         }
         public IfcBooleanOperand exclude(List<IfcRepresentation> excludeReps, IfcBooleanOperand ifcBooleanOperand)
         {
@@ -127,7 +129,12 @@ namespace JSON2IFC
             });
             ifcStyledItem.Item = ifcRepresentationItem;
         }
-        
+        public Guid GenerateSeededGuid()
+        {
+            var guid = new byte[16];
+            random.NextBytes(guid);
+            return new Guid(guid);
+        }
     }
 
 }

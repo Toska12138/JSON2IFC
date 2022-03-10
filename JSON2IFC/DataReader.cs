@@ -98,6 +98,18 @@ namespace JSON2IFC
             //new DataWriter().writeJson(o, path + ".json");
             return JsonSerializer.Deserialize<Dictionary<string, List<PropertySet>>>(jsonText, serializeOptions);
         }
+        public Dictionary<string, MetaObject> readMetaData(string path)
+        {
+            StreamReader srReadFile = new StreamReader(path);
+            string jsonText = "";
+            while (!srReadFile.EndOfStream)
+            {
+                jsonText += srReadFile.ReadLine();
+            }
+            var serializeOptions = new JsonSerializerOptions();
+            serializeOptions.Converters.Add(new StringConverter());
+            return JsonSerializer.Deserialize<Dictionary<string, MetaObject>>(jsonText, serializeOptions);
+        }
         class StringConverter : JsonConverter<string>
         {
             public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

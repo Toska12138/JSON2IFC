@@ -26,6 +26,7 @@ using Xbim.Ifc4.PropertyResource;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
 using Xbim.Ifc4.TopologyResource;
+using Xbim.Ifc4.UtilityResource;
 using Xbim.IO;
 using static JSON2IFC.Material;
 using static JSON2IFC.SJSONPlugin;

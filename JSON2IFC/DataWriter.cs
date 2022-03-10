@@ -39,7 +39,7 @@ namespace JSON2IFC
         {
 
         }
-        public Boolean writerIfc(IfcStore ifcStore, string outputIfcFilePath)
+        public Boolean writeIfc(IfcStore ifcStore, string outputIfcFilePath)
         {
             ifcStore.SaveAs(outputIfcFilePath, StorageType.Ifc);
             return true;

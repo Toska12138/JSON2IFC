@@ -42,24 +42,8 @@ namespace JSON2IFC
         }
         public void addObject(IfcProduct ifcProduct)
         {
-            Console.WriteLine(ifcProduct.Name);
-            Console.WriteLine(ifcProduct.GetType().Name);
-            Console.WriteLine(ifcProduct.GlobalId);
-            Console.WriteLine();
-            this.metaObjects.Add(ifcProduct.GlobalId, new MetaObject() 
-            { 
-                name = ifcProduct.Name,
-                type = ifcProduct.GetType().Name,
-                id = ifcProduct.GlobalId,
-                propertySets = ifcProduct.IsDefinedBy.ToList().ConvertAll(e => 
-                {
-                    return new PropertySet()
-                    {
-                        name = (e.RelatingPropertyDefinition as IfcPropertySet).Name,
-                        properties = (e.RelatingPropertyDefinition as IfcPropertySet).HasProperties.ToList().ConvertAll(props => (IfcPropertySingleValue)props).ConvertAll(p => new Property() { name = p.Name, label = p.GetType().Name, value = p.NominalValue.ToString() })
-                    };
-                    })
-            });
+            KeyValuePair<string, MetaObject> pair = Converter.ToObject(ifcProduct);
+            this.metaObjects.Add(pair.Key, pair.Value);
         }
         public void addObject(List<IfcProduct> ifcProducts)
         {

@@ -60,11 +60,11 @@ namespace JSON2IFC
                 })));
             });
         }
-        public void defineProperties(IfcProduct ifcProduct, Dictionary<string, List<PropertySet>> propertySets)
+        public void defineProperties(IfcProduct ifcProduct, Dictionary<string, List<PropertySet>> generalname_n_propertySets)
         {
-            if(propertySets != null)
+            if(generalname_n_propertySets[ifcProduct.GetType().Name] != null)
             {
-                propertySets[ifcProduct.GetType().Name].ConvertAll(props => generateSet(props)).ForEach(props =>
+                generalname_n_propertySets[ifcProduct.GetType().Name].ConvertAll(props => generateSet(props)).ForEach(props =>
                 {
                     ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
                     {
@@ -72,6 +72,65 @@ namespace JSON2IFC
                         relDefinesByProperties.RelatingPropertyDefinition = props;
                     });
                 });
+            }
+        }
+        public void defineProperties(IfcProduct ifcProduct, List<PropertySet> propertySets)
+        {
+            if (propertySets != null)
+            {
+                propertySets.ConvertAll(props => generateSet(props)).ForEach(props =>
+                {
+                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                    {
+                        relDefinesByProperties.RelatedObjects.Add(ifcProduct);
+                        relDefinesByProperties.RelatingPropertyDefinition = props;
+                    });
+                });
+            }
+        }
+        public static void attachPropsToIfc(string ifcFilePath, string metaDataPath, string outputIfcPath)
+        {
+            var editor = new XbimEditorCredentials
+            {
+                ApplicationDevelopersName = "SJ-NTU Corp Lab",
+                ApplicationFullName = "JSON2IFC",
+                ApplicationIdentifier = "JSON2IFC",
+                ApplicationVersion = "1.0",
+                EditorsFamilyName = "SJ-NTU Corp Lab",
+                EditorsGivenName = "",
+                EditorsOrganisationName = "SJ-NTU Corp Lab"
+            };
+            using (var ifcStore = IfcStore.Open(ifcFilePath, editor))
+            {
+                if (!string.IsNullOrEmpty(metaDataPath) && File.Exists(metaDataPath))
+                {
+                    using (var txn = ifcStore.BeginTransaction("Defines Properties"))
+                    {
+                        Dictionary<string, MetaObject> metaObjects = new DataReader().readMetaData(metaDataPath);
+                        foreach (IfcElement element in ifcStore.Instances.OfType<IfcElement>())
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine(element.GetType().Name);
+                            if (element.GlobalId == metaObjects.First().Key)
+                            {
+                                Console.WriteLine(1);
+                                Console.ReadKey();
+                            }
+                            else
+                            {
+                                Console.WriteLine(element.GlobalId);
+                                Console.WriteLine(metaObjects.First().Key);
+                            }
+                        }
+
+                        metaObjects.ToList().ForEach(e =>
+                        {
+                            IfcElement ifcElement = ifcStore.Instances.OfType<IfcElement>().Where(i => i.GetType().Name == e.Value.type).FirstOrDefault(ii => ii.GlobalId == e.Key);
+                            new PropertyAgent(ifcStore).defineProperties(ifcElement, e.Value.propertySets);
+                        });
+                        new DataWriter().writeIfc(ifcStore, outputIfcPath);
+                    }
+                }
             }
         }
     }
@@ -85,5 +144,9 @@ namespace JSON2IFC
     {
         public string name { get; set; }
         public List<Property> properties { get; set; }
+        public IfcPropertySet ToIfcPropertySet(IfcStore ifcStore)
+        {
+            return new PropertyAgent(ifcStore).generateSet(this);
+        }
     }
 }

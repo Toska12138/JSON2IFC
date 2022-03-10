@@ -147,6 +147,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuildingComponent.cs" />
+    <Compile Include="Converter.cs" />
     <Compile Include="DataReader.cs" />
     <Compile Include="DataWriter.cs" />
     <Compile Include="IFCElementCreater.cs" />
