@@ -83,7 +83,7 @@ namespace JSON2IFC
             });
             return jo;
         }
-        public Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> readProperties(string path)
+        public Dictionary<string, List<PropertySet>> readProperties(string path)
         {
             StreamReader srReadFile = new StreamReader(path);
             string jsonText = "";
@@ -93,7 +93,10 @@ namespace JSON2IFC
             }
             var serializeOptions = new JsonSerializerOptions();
             serializeOptions.Converters.Add(new StringConverter());
-            return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>>>(jsonText, serializeOptions);
+            //Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> d = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>>>(jsonText, serializeOptions);
+            //Object o = d.ToList().ConvertAll(e => new KeyValuePair<string, List<PropertySet>>(e.Key, e.Value.ToList().ConvertAll(e1 => new PropertySet() { name = e1.Key, properties = e1.Value.ToList().ConvertAll(e2 => new Property() { name = e2.Key, label = e2.Value.First().Key, value = e2.Value.First().Value }) }))).ToDictionary(e => e.Key, e => e.Value);
+            //new DataWriter().writeJson(o, path + ".json");
+            return JsonSerializer.Deserialize<Dictionary<string, List<PropertySet>>>(jsonText, serializeOptions);
         }
         class StringConverter : JsonConverter<string>
         {

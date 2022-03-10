@@ -56,7 +56,7 @@ namespace JSON2IFC
         public Boolean writeJson(Object o, string path)
         {
             string json = JsonSerializer.Serialize(o);
-            File.WriteAllText(path, json);
+            File.WriteAllText(path + ".json", json);
             return true;
         }
     }

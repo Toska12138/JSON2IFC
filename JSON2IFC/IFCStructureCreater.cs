@@ -114,7 +114,7 @@ namespace JSON2IFC
             }
             return ret;
         }
-        public List<IfcWall> createWalls(List<IfcRepresentation> excludeReps, IfcWallType ifcWallType, Dictionary<string, Dictionary<string, Dictionary<string, string>>> properties, KeyValuePair<BuildingComponent, Style> style)
+        public List<IfcWall> createWalls(List<IfcRepresentation> excludeReps, IfcWallType ifcWallType, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
             List<IfcWall> ret = new List<IfcWall>();
             IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
@@ -297,12 +297,12 @@ namespace JSON2IFC
             }
             return ret;
         }
-        public IfcWallType createWallType(Dictionary<string, Dictionary<string, Dictionary<string, string>>> properties)
+        public IfcWallType createWallType(Dictionary<string, List<PropertySet>> properties)
         {
             PropertyAgent propertyAgent = new PropertyAgent(ifcStore);
             return ifcStore.Instances.New<IfcWallType>(wallType =>
             {
-                if(properties != null) wallType.HasPropertySets.AddRange(properties.Select(props => propertyAgent.generateSet(props.Key, props.Value)));
+                if(properties["IfcWallType"] != null) wallType.HasPropertySets.AddRange(properties["IfcWallType"].ConvertAll(props => propertyAgent.generateSet(props)));
                 wallType.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
             });
         }

@@ -160,6 +160,7 @@
     <Compile Include="PropertyAgent.cs" />
     <Compile Include="SJSONPlugin.cs" />
     <Compile Include="Style.cs" />
+    <Compile Include="TemplateBuilder.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

@@ -41,35 +41,49 @@ namespace JSON2IFC
         {
             this.ifcStore = ifcstore;
         }
-        public static Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>> defaultProperties = new Dictionary<string, Dictionary<string, Dictionary<string, Dictionary<string, string>>>>
+        public static Dictionary<string, List<PropertySet>> defaultProperties = new Dictionary<string, List<PropertySet>>
         {
             { "IfcWallType", null },
             { "IfcWall", null }
         };
-        public IfcPropertySet generateSet(string Name, Dictionary<string, Dictionary<string, string>> values)
+        public IfcPropertySet generateSet(PropertySet propSet)
         {
             return ifcStore.Instances.New<IfcPropertySet>(propertySet =>
             {
-                propertySet.Name = Name;
-                propertySet.HasProperties.AddRange(values.Select(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                propertySet.Name = propSet.name;
+                propertySet.HasProperties.AddRange(propSet.properties.ConvertAll(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                 {
-                    singleValue.Name = prop.Key;
+                    singleValue.Name = prop.name;
                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.Value.First().Key.ToString(), true);
-                    singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.Value.First().Value });
+                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.label.ToString(), true);
+                    singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.value });
                 })));
             });
         }
-        public void defineProperties(IfcProduct ifcProduct, Dictionary<string, Dictionary<string, Dictionary<string, string>>> properties)
+        public void defineProperties(IfcProduct ifcProduct, Dictionary<string, List<PropertySet>> propertySets)
         {
-            if(properties != null) properties.Select(props => generateSet(props.Key, props.Value)).ToList().ForEach(props =>
+            if(propertySets != null)
             {
-                ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                propertySets[ifcProduct.GetType().Name].ConvertAll(props => generateSet(props)).ForEach(props =>
                 {
-                    relDefinesByProperties.RelatedObjects.Add(ifcProduct);
-                    relDefinesByProperties.RelatingPropertyDefinition = props;
+                    ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                    {
+                        relDefinesByProperties.RelatedObjects.Add(ifcProduct);
+                        relDefinesByProperties.RelatingPropertyDefinition = props;
+                    });
                 });
-            });
+            }
         }
+    }
+    class Property
+    {
+        public string name { get; set; }
+        public string label { get; set; }
+        public string value { get; set; }
+    }
+    class PropertySet
+    {
+        public string name { get; set; }
+        public List<Property> properties { get; set; }
     }
 }
