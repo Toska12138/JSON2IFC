@@ -34,7 +34,7 @@ using Xbim.Ifc4.UtilityResource;
 
 namespace JSON2IFC
 {
-    public static class Json2IfcHelper
+    public static class Json2IfcHelper123
     {
         public static string error_msg;
         public const double UNIT_CONVERSION = 1000;
