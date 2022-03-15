@@ -295,7 +295,7 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDoors);
                         ifcProducts.AddRange(ifcWindows);
                         ifcProducts.AddRange(ifcSlabs);
-                        templateBuilder.addObject(ifcProducts);
+                        templateBuilder.addObjects(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
@@ -379,7 +379,7 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcPipeTFittings.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_S_Traps.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_P_Traps.ConvertAll(e => (IfcProduct)e));
-                        templateBuilder.addObject(ifcProducts);
+                        templateBuilder.addObjects(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
@@ -420,7 +420,7 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDuctSegments);
                         ifcProducts.AddRange(ifcDuctEllbows);
                         ifcProducts.AddRange(ifcDuctTFitting);
-                        templateBuilder.addObject(ifcProducts);
+                        templateBuilder.addObjects(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {

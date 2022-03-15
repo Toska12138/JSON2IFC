@@ -35,16 +35,19 @@ namespace JSON2IFC
 {
     public class TemplateBuilder
     {
+        public IfcStore IfcStore;
         public MetaModel metaModel { get; set; }
-        public TemplateBuilder()
+        public TemplateBuilder(IfcStore ifcStore)
         {
             this.metaModel = new MetaModel();
+            this.IfcStore = ifcStore;
         }
         public void addObject(IfcProduct ifcProduct)
         {
+            new PropertyAgent(IfcStore).defineProperties(ifcProduct, new PropertySet() { name = "Annotations", properties = new List<Property>() { new Property() {name = "Created By", type = "IfcText", value = "SJ-NTU Corp Lab" } } });
             this.metaModel.metaObjects.Add(Converter.ToObject(ifcProduct));
         }
-        public void addObject(List<IfcProduct> ifcProducts)
+        public void addObjects(List<IfcProduct> ifcProducts)
         {
             foreach (IfcProduct ifcProduct in ifcProducts)
             {
