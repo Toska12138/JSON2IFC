@@ -36,10 +36,9 @@ namespace JSON2IFC
     class Converter
     {
         //TODO: ToIfc element level convert
-
-        //public IfcWall ToIfc(jsonWall wall, IfcStore ifcStore, IfcBuilding ifcBuilding)
+        //public IfcColumn ToIfc(jsonColumn column, IfcStore ifcStore, IfcBuilding ifcBuilding)
         //{
-        //    return new IFCStructureCreater(ifcStore, ifcBuilding, null).createWalls();
+        //    return new IFCStructureCreater(ifcStore, ifcBuilding, null).createColumn(column, null, );
         //}
         public static PropertySet ToObject(IfcPropertySet ifcPropertySet)
         {
@@ -51,7 +50,7 @@ namespace JSON2IFC
                     return new Property()
                     {
                         name = e.Name,
-                        label = e.GetType().Name,
+                        type = e.GetType().Name,
                         value = (e as IfcPropertySingleValue).NominalValue.ToString()
                     };
                 })
@@ -67,7 +66,7 @@ namespace JSON2IFC
                     return new Property()
                     {
                         name = e.Name,
-                        label = e.NominalValue.GetType().Name,
+                        type = e.NominalValue.GetType().Name,
                         value = e.NominalValue.ToString()
                     };
                 })

@@ -44,7 +44,12 @@ namespace JSON2IFC
         public static Dictionary<string, List<PropertySet>> defaultProperties = new Dictionary<string, List<PropertySet>>
         {
             { "IfcWallType", null },
-            { "IfcWall", null }
+            { "IfcWall", null },
+            { "IfcColumnType", null },
+            { "IfcBeamType", null },
+            { "IfcWindowType", null },
+            { "IfcDoorType", null },
+            { "IfcSlabType", null}
         };
         public IfcPropertySet generateSet(PropertySet propSet)
         {
@@ -53,9 +58,10 @@ namespace JSON2IFC
                 propertySet.Name = propSet.name;
                 propertySet.HasProperties.AddRange(propSet.properties.ConvertAll(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                 {
+                    Console.WriteLine(prop.name);
                     singleValue.Name = prop.name;
                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.label.ToString(), true);
+                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString(), true);
                     singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.value });
                 })));
             });
@@ -88,6 +94,17 @@ namespace JSON2IFC
                 });
             }
         }
+        public void defineProperties(IfcProduct ifcProduct, PropertySet propertySet)
+        {
+            if (propertySet != null)
+            {
+                ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                {
+                    relDefinesByProperties.RelatedObjects.Add(ifcProduct);
+                    relDefinesByProperties.RelatingPropertyDefinition = propertySet.ToIfcPropertySet(ifcStore);
+                });
+            }
+        }
         public static void attachPropsToIfc(string ifcFilePath, string metaDataPath, string outputIfcPath)
         {
             var editor = new XbimEditorCredentials
@@ -107,21 +124,6 @@ namespace JSON2IFC
                     using (var txn = ifcStore.BeginTransaction("Defines Properties"))
                     {
                         Dictionary<string, MetaObject> metaObjects = new DataReader().readMetaData(metaDataPath);
-                        foreach (IfcElement element in ifcStore.Instances.OfType<IfcElement>())
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine(element.GetType().Name);
-                            if (element.GlobalId == metaObjects.First().Key)
-                            {
-                                Console.WriteLine(1);
-                                Console.ReadKey();
-                            }
-                            else
-                            {
-                                Console.WriteLine(element.GlobalId);
-                                Console.WriteLine(metaObjects.First().Key);
-                            }
-                        }
 
                         metaObjects.ToList().ForEach(e =>
                         {
@@ -137,7 +139,7 @@ namespace JSON2IFC
     class Property
     {
         public string name { get; set; }
-        public string label { get; set; }
+        public string type { get; set; }
         public string value { get; set; }
     }
     class PropertySet

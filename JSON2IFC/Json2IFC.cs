@@ -71,13 +71,28 @@ namespace JSON2IFC
                         IFCStructureCreater iFCStructureCreater = new IFCStructureCreater(ifcStore, ifcBuilding, js);
 
                         List<IfcRepresentation> excludeReps = new List<IfcRepresentation>();
+
+                        Dictionary<string, List<PropertySet>> general_properties = PropertyAgent.defaultProperties;
+                        if (!string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
+                        {
+                            general_properties = dataReader.readProperties(propertiesPath);
+                        }
+
                         using (var txn = ifcStore.BeginTransaction("Create Columns"))
                         {
                             //create columns
                             if (js.Column != null)
                             {
                                 res.noElements += js.Column.Length;
-                                ifcColumns.AddRange(iFCStructureCreater.createColumns(null, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Column)));
+                                js.Column.ToList().ForEach(e => 
+                                {
+                                    ifcColumns.Add(iFCStructureCreater.createColumn(e, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Column)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createColumnType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcColumns);
+                                });
                             }
                             txn.Commit();
                         }
@@ -88,7 +103,15 @@ namespace JSON2IFC
                             if (js.Beam != null)
                             {
                                 res.noElements += js.Beam.Length;
-                                ifcBeams.AddRange(iFCStructureCreater.createBeams(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam)));
+                                js.Beam.ToList().ForEach(e =>
+                                {
+                                    ifcBeams.Add(iFCStructureCreater.createBeam(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createBeamType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcBeams);
+                                });
                             }
                             txn.Commit();
                         }
@@ -192,11 +215,6 @@ namespace JSON2IFC
                         //        }
                         //    txn.Commit();
                         //}
-                        Dictionary<string, List<PropertySet>> properties = PropertyAgent.defaultProperties;
-                        if (!string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
-                        {
-                            properties = dataReader.readProperties(propertiesPath);
-                        }
 
                         using (var txn = ifcStore.BeginTransaction("Create Walls"))
                         {
@@ -204,7 +222,15 @@ namespace JSON2IFC
                             if (js.Wall != null)
                             {
                                 res.noElements += js.Wall.Length;
-                                ifcWalls.AddRange(iFCStructureCreater.createWalls(excludeReps, iFCStructureCreater.createWallType(properties), properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Wall)));
+                                js.Wall.ToList().ForEach(e =>
+                                {
+                                    ifcWalls.Add(iFCStructureCreater.createWall(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Wall)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createBeamType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcWalls);
+                                });
                             }
                             txn.Commit();
                         }
@@ -216,21 +242,46 @@ namespace JSON2IFC
                             if (js.Window != null)
                             {
                                 res.noElements += js.Window.Length;
-                                ifcWindows.AddRange(iFCStructureCreater.createWindows(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Window)));
+                                js.Window.ToList().ForEach(e =>
+                                {
+                                    ifcWindows.Add(iFCStructureCreater.createWindow(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Window)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcWindows);
+                                });
                             }
                             if (js.Door != null)
                             {
                                 res.noElements += js.Door.Length;
-                                ifcDoors.AddRange(iFCStructureCreater.createDoors(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Door)));
+                                js.Door.ToList().ForEach(e =>
+                                {
+                                    ifcDoors.Add(iFCStructureCreater.createDoor(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Door)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcDoors);
+                                });
                             }
                             txn.Commit();
                         }
-                        using (var txn = ifcStore.BeginTransaction("Create Slabs"))
+                        using (var txn = ifcStore.BeginTransaction("Create Slabs")) 
                         {
                             if (js.Slab != null)
                             {
                                 res.noElements += js.Slab.Length;
-                                ifcSlabs.AddRange(iFCStructureCreater.createSlabs(null, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Slab)));
+                                js.Slab.ToList().ForEach(e =>
+                                {
+                                    ifcSlabs.Add(iFCStructureCreater.createSlab(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Slab)).Item1);
+                                    ifcSlabs.Add(iFCStructureCreater.createSlab(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Slab)).Item2);
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcSlabs);
+                                });
                             }
                             txn.Commit();
                         }
