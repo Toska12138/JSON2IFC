@@ -34,7 +34,7 @@ using Xbim.Ifc4.UtilityResource;
 
 namespace JSON2IFC
 {
-    public static class Json2IfcHelper123
+    public static class Json2IfcHelper
     {
         public static string error_msg;
         public const double UNIT_CONVERSION = 1000;
@@ -383,7 +383,7 @@ namespace JSON2IFC
                     }
 
                     dataWriter.writeIfc(ifcStore, outputIfcFilePath);
-                    dataWriter.writeJson(templateBuilder.metaObjects, outputIfcFilePath);
+                    dataWriter.writeJson(templateBuilder.metaModel, outputIfcFilePath + ".json");
                     if (error_msg != null) dataWriter.WriteError(error_msg, outputIfcFilePath);
                     Console.WriteLine("Press any key to continue...");
                     Console.ReadLine();
