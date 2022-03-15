@@ -1,0 +1,11 @@
+A HDB
+No. of Elements: 	76
+Conversion Time: 	1053
+
+B SJ-NTU Corp Lab
+No. of Elements: 	195
+Conversion Time: 	1118
+
+C Open Space
+No. of Elements: 	260
+Conversion Time: 	1163

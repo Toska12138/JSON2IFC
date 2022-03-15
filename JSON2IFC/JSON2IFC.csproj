@@ -146,9 +146,22 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BuildingComponent.cs" />
+    <Compile Include="Converter.cs" />
+    <Compile Include="DataReader.cs" />
+    <Compile Include="DataWriter.cs" />
+    <Compile Include="IFCElementCreater.cs" />
+    <Compile Include="IFCMEPCreater.cs" />
+    <Compile Include="IFCStructureCreater.cs" />
+    <Compile Include="Material.cs" />
+    <Compile Include="MEPAdjuster.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Json2IFC.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PropertyAgent.cs" />
+    <Compile Include="SJSONPlugin.cs" />
+    <Compile Include="Style.cs" />
+    <Compile Include="TemplateBuilder.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
