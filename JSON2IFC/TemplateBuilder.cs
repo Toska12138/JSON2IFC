@@ -33,31 +33,41 @@ using static JSON2IFC.IFCStructureCreater;
 
 namespace JSON2IFC
 {
-    class TemplateBuilder
+    public class TemplateBuilder
     {
-        public Dictionary<string,MetaObject> metaObjects { get; set; }
+        public MetaModel metaModel { get; set; }
         public TemplateBuilder()
         {
-            this.metaObjects = new Dictionary<string, MetaObject>();
+            this.metaModel = new MetaModel();
         }
         public void addObject(IfcProduct ifcProduct)
         {
-            KeyValuePair<string, MetaObject> pair = Converter.ToObject(ifcProduct);
-            this.metaObjects.Add(pair.Key, pair.Value);
+            this.metaModel.metaObjects.Add(Converter.ToObject(ifcProduct));
         }
         public void addObject(List<IfcProduct> ifcProducts)
         {
-            foreach(IfcProduct ifcProduct in ifcProducts)
+            foreach (IfcProduct ifcProduct in ifcProducts)
             {
                 this.addObject(ifcProduct);
             }
         }
     }
-    class MetaObject
+    public class MetaObject
     {
         public string name { get; set; }
         public string type { get; set; }
         public string id { get; set; }
         public List<PropertySet> propertySets { get; set; }
+    }
+    public class MetaModel
+    {
+        public MetaModel(){
+            this.metaObjects = new List<MetaObject>();
+            this.revisionId = "none";
+        }
+        public string projectId { get; set; }
+        public string revisionId { get; set; }
+        public string id { get; set; }
+        public List<MetaObject> metaObjects { get; set; }
     }
 }

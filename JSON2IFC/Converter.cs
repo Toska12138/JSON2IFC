@@ -33,7 +33,7 @@ using static JSON2IFC.IFCStructureCreater;
 
 namespace JSON2IFC
 {
-    class Converter
+    public class Converter
     {
         //TODO: ToIfc element level convert
         //public IfcColumn ToIfc(jsonColumn column, IfcStore ifcStore, IfcBuilding ifcBuilding)
@@ -72,15 +72,15 @@ namespace JSON2IFC
                 })
             };
         }
-       public static KeyValuePair<string, MetaObject> ToObject(IfcProduct ifcProduct)
+       public static MetaObject ToObject(IfcProduct ifcProduct)
         {
-            return new KeyValuePair<string, MetaObject>(ifcProduct.GlobalId, new MetaObject()
+            return new MetaObject()
             {
                 name = ifcProduct.Name,
                 type = ifcProduct.GetType().Name,
                 id = ifcProduct.GlobalId,
                 propertySets = ifcProduct.IsDefinedBy.Where(r => r.RelatingPropertyDefinition is IfcPropertySet).ToList().ConvertAll(e => { return ToObject(e.RelatingPropertyDefinition as IIfcPropertySet); })
-            });
+            };
         }
     }
 }

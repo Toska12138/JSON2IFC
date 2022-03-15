@@ -434,7 +434,7 @@ namespace JSON2IFC
                     }
 
                     dataWriter.writeIfc(ifcStore, outputIfcFilePath);
-                    dataWriter.writeJson(templateBuilder.metaObjects, outputIfcFilePath);
+                    dataWriter.writeJson(templateBuilder.metaModel, outputIfcFilePath + ".json");
                     if (error_msg != null) dataWriter.WriteError(error_msg, outputIfcFilePath);
                     Console.WriteLine("Press any key to continue...");
                     Console.ReadLine();
