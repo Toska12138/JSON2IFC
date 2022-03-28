@@ -1,38 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Security.Policy;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-using Xbim.Common;
-using Xbim.Common.Step21;
 using Xbim.Ifc;
-using Xbim.Ifc4;
-using Xbim.Ifc4.GeometricConstraintResource;
-using Xbim.Ifc4.GeometricModelResource;
-using Xbim.Ifc4.GeometryResource;
-using Xbim.Ifc4.HvacDomain;
-using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
-using Xbim.Ifc4.MaterialResource;
 using Xbim.Ifc4.MeasureResource;
-using Xbim.Ifc4.PresentationAppearanceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
-using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.PropertyResource;
-using Xbim.Ifc4.RepresentationResource;
-using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.TopologyResource;
-using Xbim.IO;
-using static JSON2IFC.Material;
-using static JSON2IFC.SJSONPlugin;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
     class PropertyAgent
     {
@@ -58,7 +35,6 @@ namespace JSON2IFC
                 propertySet.Name = propSet.name;
                 propertySet.HasProperties.AddRange(propSet.properties.ConvertAll(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                 {
-                    Console.WriteLine(prop.name);
                     singleValue.Name = prop.name;
                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
                     Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString(), true);
@@ -144,7 +120,10 @@ namespace JSON2IFC
     }
     public class PropertySet
     {
+        public string id { get; set; }
         public string name { get; set; }
+        public string type { get; set; }
+        public string originalSystemId { get; set; }
         public List<Property> properties { get; set; }
         public IfcPropertySet ToIfcPropertySet(IfcStore ifcStore)
         {

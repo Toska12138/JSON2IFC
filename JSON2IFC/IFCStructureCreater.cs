@@ -1,38 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-using Xbim.Common;
-using Xbim.Common.Step21;
+using Scan2BimShared.Models;
+using Scan2BimShared.Models.IfcEntities;
+using Scan2BimShared.StaticData.IfcEnums;
 using Xbim.Ifc;
-using Xbim.Ifc4.GeometricConstraintResource;
 using Xbim.Ifc4.GeometricModelResource;
 using Xbim.Ifc4.GeometryResource;
-using Xbim.Ifc4.HvacDomain;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
-using Xbim.Ifc4.MaterialResource;
 using Xbim.Ifc4.MeasureResource;
-using Xbim.Ifc4.PresentationAppearanceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.ProfileResource;
-using Xbim.Ifc4.PropertyResource;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.TopologyResource;
-using Xbim.Ifc4.UtilityResource;
-using Xbim.IO;
-using static JSON2IFC.Material;
-using static JSON2IFC.SJSONPlugin;
 
-
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
     class IFCStructureCreater : IFCElementCreater
     {
@@ -210,7 +193,7 @@ namespace JSON2IFC
             });
             new PropertyAgent(ifcStore).defineProperties(ifcColumn, properties);
             setAppearance(ifcColumn.Representation.Representations.First().Items.First(), style);
-            attachMaterial(ifcColumn, Concrete);
+            attachMaterial(ifcColumn, Material.Concrete);
             return ifcColumn;
         }
         public IfcBeam createBeam(jsonBeam jsonBeam, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
@@ -256,7 +239,7 @@ namespace JSON2IFC
             });
             new PropertyAgent(ifcStore).defineProperties(ifcBeam, properties);
             setAppearance(ifcBeam.Representation.Representations.First().Items.First(), style);
-            attachMaterial(ifcBeam, Concrete);
+            attachMaterial(ifcBeam, Material.Concrete);
             return ifcBeam;
         }
         public IfcWall createWall(jsonWall jsonWall, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
@@ -297,7 +280,7 @@ namespace JSON2IFC
                 }
             });
             setAppearance(ifcWall.Representation.Representations.First().Items.First(), style);
-            attachMaterial(ifcWall, Concrete);
+            attachMaterial(ifcWall, Material.Concrete);
             new PropertyAgent(ifcStore).defineProperties(ifcWall, properties);
             return ifcWall;
         }
@@ -342,7 +325,7 @@ namespace JSON2IFC
             });
             setAppearance(ifcWindow.Representation.Representations.First().Items.First(), style);
             new PropertyAgent(ifcStore).defineProperties(ifcWindow, properties);
-            attachMaterial(ifcWindow, Glass);
+            attachMaterial(ifcWindow, Material.Glass);
             return ifcWindow;
         }
         public IfcDoor createDoor(jsonDoor jsonDoor, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
@@ -386,7 +369,7 @@ namespace JSON2IFC
             });
             setAppearance(ifcDoor.Representation.Representations.First().Items.First(), style);
             new PropertyAgent(ifcStore).defineProperties(ifcDoor, properties);
-            attachMaterial(ifcDoor, Wood);
+            attachMaterial(ifcDoor, Material.Wood);
             return ifcDoor;
         }
         public Tuple<IfcSlab, IfcSlab> createSlab(jsonSlab jsonSlab, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
@@ -411,7 +394,7 @@ namespace JSON2IFC
                 });
                 slab.ObjectPlacement = ifcBuilding.ObjectPlacement;
             });//floor
-            attachMaterial(ifcSlab1, Concrete);
+            attachMaterial(ifcSlab1, Material.Concrete);
 
             IfcSlab ifcSlab2 = ifcStore.Instances.New<IfcSlab>(slab =>
             {
@@ -437,7 +420,7 @@ namespace JSON2IFC
             });
             new PropertyAgent(ifcStore).defineProperties(ifcSlab2, properties);
             new PropertyAgent(ifcStore).defineProperties(ifcSlab1, properties);
-            attachMaterial(ifcSlab2, Concrete);
+            attachMaterial(ifcSlab2, Material.Concrete);
             setAppearance(ifcSlab1.Representation.Representations.First().Items.First(), style);
             setAppearance(ifcSlab2.Representation.Representations.First().Items.First(), style);
             return new Tuple<IfcSlab, IfcSlab>(ifcSlab1, ifcSlab2);
