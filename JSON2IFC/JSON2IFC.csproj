@@ -162,6 +162,7 @@
     <Compile Include="SJSONPlugin.cs" />
     <Compile Include="Style.cs" />
     <Compile Include="TemplateBuilder.cs" />
+    <Compile Include="AttachProp.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
