@@ -1,36 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-using Xbim.Common;
-using Xbim.Common.Step21;
+using Scan2BimShared.Models.IfcEntities;
+using Scan2BimShared.StaticData.IfcEnums;
 using Xbim.Ifc;
-using Xbim.Ifc4.GeometricConstraintResource;
 using Xbim.Ifc4.GeometricModelResource;
 using Xbim.Ifc4.GeometryResource;
 using Xbim.Ifc4.HvacDomain;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
-using Xbim.Ifc4.MaterialResource;
 using Xbim.Ifc4.MeasureResource;
-using Xbim.Ifc4.PresentationAppearanceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.ProfileResource;
-using Xbim.Ifc4.PropertyResource;
 using Xbim.Ifc4.RepresentationResource;
-using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.TopologyResource;
-using Xbim.IO;
-using static JSON2IFC.Material;
-using static JSON2IFC.SJSONPlugin;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
     class IFCMEPCreater : IFCElementCreater
     {
@@ -84,7 +68,7 @@ namespace JSON2IFC
                     });
                     flowSegment.ObjectPlacement = ifcBuilding.ObjectPlacement;
                 });
-                attachMaterial((IfcProduct)ifcFlowSegment, PVC);
+                attachMaterial((IfcProduct)ifcFlowSegment, Material.PVC);
                 ret.Add(ifcFlowSegment);
             }
             return ret;
@@ -128,7 +112,7 @@ namespace JSON2IFC
                         });
                         flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
                     });
-                    attachMaterial((IfcProduct)ifcFlowFitting, PVC);
+                    attachMaterial((IfcProduct)ifcFlowFitting, Material.PVC);
                     ret.Add(ifcFlowFitting);
                 }
             }
@@ -176,7 +160,7 @@ namespace JSON2IFC
                         flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
                         ret.Add(flowFitting);
                     });
-                    attachMaterial((IfcProduct)ifcFlowFitting, PVC);
+                    attachMaterial((IfcProduct)ifcFlowFitting, Material.PVC);
                 }
             }
             return ret;
@@ -272,7 +256,7 @@ namespace JSON2IFC
                     flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
                 });
                 ret.Add(ifcFlowFitting);
-                attachMaterial((IfcProduct)ifcFlowFitting, PVC);
+                attachMaterial((IfcProduct)ifcFlowFitting, Material.PVC);
             }
             return ret;
         }
@@ -367,7 +351,7 @@ namespace JSON2IFC
                     });
                     flowFitting.ObjectPlacement = ifcBuilding.ObjectPlacement;
                 });
-                attachMaterial((IfcProduct)ifcFlowFitting, PVC);
+                attachMaterial((IfcProduct)ifcFlowFitting, Material.PVC);
                 ret.Add(ifcFlowFitting);
             }
             return ret;
@@ -397,7 +381,7 @@ namespace JSON2IFC
                     });
                     flowSegment.ObjectPlacement = ifcBuilding.ObjectPlacement;
                 });
-                attachMaterial(ifcDuctSegment, Steel);
+                attachMaterial(ifcDuctSegment, Material.Steel);
                 ret.Add(ifcDuctSegment);
             }
             return ret;

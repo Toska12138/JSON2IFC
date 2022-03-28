@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
+using Scan2BimShared.Models;
+using Scan2BimShared.Models.IfcEntities;
+using Scan2BimShared.StaticData.IfcEnums;
 using Xbim.Common;
 using Xbim.Common.Step21;
 using Xbim.Ifc;
@@ -17,28 +15,18 @@ using Xbim.Ifc4.HvacDomain;
 using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
 using Xbim.Ifc4.MaterialResource;
-using Xbim.Ifc4.MeasureResource;
-using Xbim.Ifc4.PresentationAppearanceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
-using Xbim.Ifc4.ProfileResource;
-using Xbim.Ifc4.PropertyResource;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.TopologyResource;
 using Xbim.IO;
-using static JSON2IFC.Material;
-using static JSON2IFC.SJSONPlugin;
-using static JSON2IFC.IFCStructureCreater;
-using Xbim.Ifc4.UtilityResource;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
     public static class Json2IfcHelper
     {
         public static string error_msg;
         public const double UNIT_CONVERSION = 1000;
-        public static Result GenerateIFC(XbimSchemaVersion release, string outputIfcFilePath, string structureFilePath, string mepFilePath, string ductFilePath, string beamFilePath, string propertiesPath, string appearancePath, string metaDataFilePath)
+        public static Result GenerateIFC(XbimSchemaVersion release, string outputIfcFilePath, string structureFilePath, string mepFilePath, string ductFilePath, string beamFilePath, string propertiesPath, string appearancePath)
         {
             if(!string.IsNullOrEmpty(appearancePath) && File.Exists(appearancePath))
             {
@@ -48,11 +36,12 @@ namespace JSON2IFC
             Result res = new Result(0);
             DataReader dataReader = new DataReader();
             DataWriter dataWriter = new DataWriter();
-            TemplateBuilder templateBuilder = new TemplateBuilder();
             using (var ifcStore = createandInitModel("Model"))
             {
                 if (ifcStore != null)
                 {
+                    TemplateBuilder templateBuilder = new TemplateBuilder(ifcStore);
+
                     IfcBuilding ifcBuilding = createBuilding(ifcStore, "Building");
                     IfcBuildingStorey ifcBuildingStorey = createStorey(ifcBuilding);
 
@@ -71,13 +60,28 @@ namespace JSON2IFC
                         IFCStructureCreater iFCStructureCreater = new IFCStructureCreater(ifcStore, ifcBuilding, js);
 
                         List<IfcRepresentation> excludeReps = new List<IfcRepresentation>();
+
+                        Dictionary<string, List<PropertySet>> general_properties = PropertyAgent.defaultProperties;
+                        if (!string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
+                        {
+                            general_properties = dataReader.readProperties(propertiesPath);
+                        }
+
                         using (var txn = ifcStore.BeginTransaction("Create Columns"))
                         {
                             //create columns
                             if (js.Column != null)
                             {
                                 res.noElements += js.Column.Length;
-                                ifcColumns.AddRange(iFCStructureCreater.createColumns(null, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Column)));
+                                js.Column.ToList().ForEach(e => 
+                                {
+                                    ifcColumns.Add(iFCStructureCreater.createColumn(e, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Column)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createColumnType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcColumns);
+                                });
                             }
                             txn.Commit();
                         }
@@ -88,7 +92,15 @@ namespace JSON2IFC
                             if (js.Beam != null)
                             {
                                 res.noElements += js.Beam.Length;
-                                ifcBeams.AddRange(iFCStructureCreater.createBeams(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam)));
+                                js.Beam.ToList().ForEach(e =>
+                                {
+                                    ifcBeams.Add(iFCStructureCreater.createBeam(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createBeamType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcBeams);
+                                });
                             }
                             txn.Commit();
                         }
@@ -107,7 +119,7 @@ namespace JSON2IFC
                                 {
                                     relAssociatesMaterial.RelatingMaterial = ifcStore.Instances.New<IfcMaterial>(material =>
                                     {
-                                        material.Name = Concrete.ToString();
+                                        material.Name = Material.Concrete.ToString();
                                     });
                                 });
                                 foreach (jsonBeam jsonBeam in jb)
@@ -192,11 +204,6 @@ namespace JSON2IFC
                         //        }
                         //    txn.Commit();
                         //}
-                        Dictionary<string, List<PropertySet>> properties = PropertyAgent.defaultProperties;
-                        if (!string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
-                        {
-                            properties = dataReader.readProperties(propertiesPath);
-                        }
 
                         using (var txn = ifcStore.BeginTransaction("Create Walls"))
                         {
@@ -204,7 +211,15 @@ namespace JSON2IFC
                             if (js.Wall != null)
                             {
                                 res.noElements += js.Wall.Length;
-                                ifcWalls.AddRange(iFCStructureCreater.createWalls(excludeReps, iFCStructureCreater.createWallType(properties), properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Wall)));
+                                js.Wall.ToList().ForEach(e =>
+                                {
+                                    ifcWalls.Add(iFCStructureCreater.createWall(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Wall)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWallType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcWalls);
+                                });
                             }
                             txn.Commit();
                         }
@@ -216,21 +231,47 @@ namespace JSON2IFC
                             if (js.Window != null)
                             {
                                 res.noElements += js.Window.Length;
-                                ifcWindows.AddRange(iFCStructureCreater.createWindows(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Window)));
+                                js.Window.ToList().ForEach(e =>
+                                {
+                                    ifcWindows.Add(iFCStructureCreater.createWindow(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Window)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcWindows);
+                                });
                             }
                             if (js.Door != null)
                             {
                                 res.noElements += js.Door.Length;
-                                ifcDoors.AddRange(iFCStructureCreater.createDoors(excludeReps, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Door)));
+                                js.Door.ToList().ForEach(e =>
+                                {
+                                    ifcDoors.Add(iFCStructureCreater.createDoor(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Door)));
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcDoors);
+                                });
                             }
                             txn.Commit();
                         }
-                        using (var txn = ifcStore.BeginTransaction("Create Slabs"))
+                        using (var txn = ifcStore.BeginTransaction("Create Slabs")) 
                         {
                             if (js.Slab != null)
                             {
                                 res.noElements += js.Slab.Length;
-                                ifcSlabs.AddRange(iFCStructureCreater.createSlabs(null, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Slab)));
+                                js.Slab.ToList().ForEach(e =>
+                                {
+                                    Tuple<IfcSlab, IfcSlab> slabs = iFCStructureCreater.createSlab(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Slab));
+                                    ifcSlabs.Add(slabs.Item1);
+                                    ifcSlabs.Add(slabs.Item2);
+                                });
+                                IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
+                                {
+                                    relDefinesByType.RelatingType = iFCStructureCreater.createWindowType(general_properties);
+                                    relDefinesByType.RelatedObjects.AddRange(ifcSlabs);
+                                });
                             }
                             txn.Commit();
                         }
@@ -244,11 +285,10 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDoors);
                         ifcProducts.AddRange(ifcWindows);
                         ifcProducts.AddRange(ifcSlabs);
-                        templateBuilder.addObject(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
-
+                            templateBuilder.addObjects(ifcProducts);
                             ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
                             foreach (IfcProduct ifcProduct in ifcProducts)
                             {
@@ -328,10 +368,10 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcPipeTFittings.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_S_Traps.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_P_Traps.ConvertAll(e => (IfcProduct)e));
-                        templateBuilder.addObject(ifcProducts);
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
+                            templateBuilder.addObjects(ifcProducts);
                             ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
                             foreach (IfcProduct ifcProduct in ifcProducts)
                             {
@@ -359,6 +399,7 @@ namespace JSON2IFC
 
                         using (var txn = ifcStore.BeginTransaction("Create Ducts"))
                         {
+                             templateBuilder.addObjects(ifcProducts);
                             if (jm.duct != null)
                             {
                                 ifcDuctSegments.AddRange(iFCMEPCreater.createDucts());
@@ -369,7 +410,7 @@ namespace JSON2IFC
                         ifcProducts.AddRange(ifcDuctSegments);
                         ifcProducts.AddRange(ifcDuctEllbows);
                         ifcProducts.AddRange(ifcDuctTFitting);
-                        templateBuilder.addObject(ifcProducts);
+
 
                         using (var txn = ifcStore.BeginTransaction(""))
                         {
@@ -383,10 +424,11 @@ namespace JSON2IFC
                     }
 
                     dataWriter.writeIfc(ifcStore, outputIfcFilePath);
+                    // dataWriter.writeJson(templateBuilder.metaModel, outputIfcFilePath + ".json");
                     dataWriter.writeJson(templateBuilder.metaModel, outputIfcFilePath + ".json");
                     if (error_msg != null) dataWriter.WriteError(error_msg, outputIfcFilePath);
-                    Console.WriteLine("Press any key to continue...");
-                    Console.ReadLine();
+                    // Console.WriteLine("Press any key to continue...");
+                    // Console.ReadLine();
                     return res;
                 }
             }

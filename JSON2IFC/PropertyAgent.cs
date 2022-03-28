@@ -1,38 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Security.Policy;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-using Xbim.Common;
-using Xbim.Common.Step21;
 using Xbim.Ifc;
-using Xbim.Ifc4;
-using Xbim.Ifc4.GeometricConstraintResource;
-using Xbim.Ifc4.GeometricModelResource;
-using Xbim.Ifc4.GeometryResource;
-using Xbim.Ifc4.HvacDomain;
-using Xbim.Ifc4.Interfaces;
 using Xbim.Ifc4.Kernel;
-using Xbim.Ifc4.MaterialResource;
 using Xbim.Ifc4.MeasureResource;
-using Xbim.Ifc4.PresentationAppearanceResource;
-using Xbim.Ifc4.PresentationOrganizationResource;
 using Xbim.Ifc4.ProductExtension;
-using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.PropertyResource;
-using Xbim.Ifc4.RepresentationResource;
-using Xbim.Ifc4.SharedBldgElements;
-using Xbim.Ifc4.TopologyResource;
-using Xbim.IO;
-using static JSON2IFC.Material;
-using static JSON2IFC.SJSONPlugin;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
     class PropertyAgent
     {
@@ -44,7 +21,12 @@ namespace JSON2IFC
         public static Dictionary<string, List<PropertySet>> defaultProperties = new Dictionary<string, List<PropertySet>>
         {
             { "IfcWallType", null },
-            { "IfcWall", null }
+            { "IfcWall", null },
+            { "IfcColumnType", null },
+            { "IfcBeamType", null },
+            { "IfcWindowType", null },
+            { "IfcDoorType", null },
+            { "IfcSlabType", null}
         };
         public IfcPropertySet generateSet(PropertySet propSet)
         {
@@ -55,7 +37,7 @@ namespace JSON2IFC
                 {
                     singleValue.Name = prop.name;
                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.label.ToString(), true);
+                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString(), true);
                     singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.value });
                 })));
             });
@@ -88,6 +70,17 @@ namespace JSON2IFC
                 });
             }
         }
+        public void defineProperties(IfcProduct ifcProduct, PropertySet propertySet)
+        {
+            if (propertySet != null)
+            {
+                ifcStore.Instances.New<IfcRelDefinesByProperties>(relDefinesByProperties =>
+                {
+                    relDefinesByProperties.RelatedObjects.Add(ifcProduct);
+                    relDefinesByProperties.RelatingPropertyDefinition = propertySet.ToIfcPropertySet(ifcStore);
+                });
+            }
+        }
         public static void attachPropsToIfc(string ifcFilePath, string metaDataPath, string outputIfcPath)
         {
             var editor = new XbimEditorCredentials
@@ -107,21 +100,6 @@ namespace JSON2IFC
                     using (var txn = ifcStore.BeginTransaction("Defines Properties"))
                     {
                         Dictionary<string, MetaObject> metaObjects = new DataReader().readMetaData(metaDataPath);
-                        foreach (IfcElement element in ifcStore.Instances.OfType<IfcElement>())
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine(element.GetType().Name);
-                            if (element.GlobalId == metaObjects.First().Key)
-                            {
-                                Console.WriteLine(1);
-                                Console.ReadKey();
-                            }
-                            else
-                            {
-                                Console.WriteLine(element.GlobalId);
-                                Console.WriteLine(metaObjects.First().Key);
-                            }
-                        }
 
                         metaObjects.ToList().ForEach(e =>
                         {
@@ -134,15 +112,18 @@ namespace JSON2IFC
             }
         }
     }
-    class Property
+    public class Property
     {
         public string name { get; set; }
-        public string label { get; set; }
+        public string type { get; set; }
         public string value { get; set; }
     }
-    class PropertySet
+    public class PropertySet
     {
+        public string id { get; set; }
         public string name { get; set; }
+        public string type { get; set; }
+        public string originalSystemId { get; set; }
         public List<Property> properties { get; set; }
         public IfcPropertySet ToIfcPropertySet(IfcStore ifcStore)
         {
