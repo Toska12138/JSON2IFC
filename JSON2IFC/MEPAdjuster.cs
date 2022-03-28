@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static JSON2IFC.SJSONPlugin;
+using Scan2BimShared.Models.IfcEntities;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
-    class MEPAdjuster
+    public class MEPAdjuster
     {
         const double FITTING_RADIUS_RATIO = 1.5;
         const double PIPE_LENGTH_LIMIT = 0.01;
