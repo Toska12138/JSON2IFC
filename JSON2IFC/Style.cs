@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Scan2BimShared.StaticData.IfcEnums;
 
-namespace JSON2IFC
+namespace Scan2BimShared.Models.IfcEntities
 {
     class Style
     {

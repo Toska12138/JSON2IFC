@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Scan2BimShared.Models;
 using Scan2BimShared.Models.IfcEntities;
 using Scan2BimShared.StaticData.IfcEnums;
+using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
@@ -74,7 +75,7 @@ namespace Scan2BimConnect.Utilities
             //new DataWriter().writeJson(o, path + ".json");
             return JsonSerializer.Deserialize<Dictionary<string, List<PropertySet>>>(jsonText, serializeOptions);
         }
-        public Dictionary<string, MetaObject> readMetaData(string path)
+        public MetaModel readMetaData(string path)
         {
             StreamReader srReadFile = new StreamReader(path);
             string jsonText = "";
@@ -84,7 +85,7 @@ namespace Scan2BimConnect.Utilities
             }
             var serializeOptions = new JsonSerializerOptions();
             serializeOptions.Converters.Add(new StringConverter());
-            return JsonSerializer.Deserialize<Dictionary<string, MetaObject>>(jsonText, serializeOptions);
+            return JsonSerializer.Deserialize<MetaModel>(jsonText, serializeOptions);
         }
         class StringConverter : JsonConverter<string>
         {

@@ -81,7 +81,7 @@ namespace Scan2BimConnect.Utilities
                 });
             }
         }
-        public static void attachPropsToIfc(string ifcFilePath, string metaDataPath, string outputIfcPath)
+        public static void writePropToIFC(string ifcFilePath, string metaDataPath, string outputIfcPath)
         {
             var editor = new XbimEditorCredentials
             {
@@ -99,16 +99,75 @@ namespace Scan2BimConnect.Utilities
                 {
                     using (var txn = ifcStore.BeginTransaction("Defines Properties"))
                     {
-                        Dictionary<string, MetaObject> metaObjects = new DataReader().readMetaData(metaDataPath);
-
-                        metaObjects.ToList().ForEach(e =>
+                        MetaModel metaModel = new DataReader().readMetaData(metaDataPath);
+                        metaModel.metaObjects.ToList().ForEach(o =>
                         {
-                            IfcElement ifcElement = ifcStore.Instances.OfType<IfcElement>().Where(i => i.GetType().Name == e.Value.type).FirstOrDefault(ii => ii.GlobalId == e.Key);
-                            new PropertyAgent(ifcStore).defineProperties(ifcElement, e.Value.propertySets);
+                            if(o.type != "Model")
+                            {
+                                IfcProduct ifcProduct = ifcStore.Instances.OfType<IfcProduct>().First(e => e.GlobalId == o.id);
+                                List<string> ids = o.propertySets.ConvertAll(pSet => pSet.originalSystemId);
+                                foreach (IfcRelDefinesByProperties ifcRelDefinesByProperties in ifcProduct.IsDefinedBy)
+                                {
+                                    if (!ids.Contains((ifcRelDefinesByProperties.RelatingPropertyDefinition as IfcPropertySet).GlobalId))
+                                    {
+                                        ifcRelDefinesByProperties.RelatedObjects.Remove(ifcProduct);
+                                    }
+                                }
+                                if (o.propertySets.Count > 0)
+                                {
+                                    o.propertySets.ForEach(pSet =>
+                                    {
+                                        if (pSet.originalSystemId != null && !string.IsNullOrEmpty(pSet.originalSystemId))
+                                        {
+                                            IfcPropertySet ifcPropertySet = ifcStore.Instances.OfType<IfcPropertySet>().First(ifcPset => ifcPset.GlobalId == pSet.originalSystemId);
+                                            ifcPropertySet.Name = pSet.name;
+                                            List<IfcPropertySingleValue> elementToDelete = new List<IfcPropertySingleValue>();
+                                            foreach (IfcPropertySingleValue ifcPropertySingleValue in ifcPropertySet.HasProperties)
+                                            {
+                                                elementToDelete.Add(ifcPropertySingleValue);
+                                            }
+                                            elementToDelete.ForEach(e => ifcStore.Delete(e));
+                                            ifcPropertySet.HasProperties.Clear();
+                                            pSet.properties.ForEach(p => ifcPropertySet.HasProperties.Add(ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                            {
+                                                singleValue.Name = p.name;
+                                                Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
+                                                Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + p.type.ToString(), true);
+                                                singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { p.value });
+                                            })));
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine("Adding pSet");
+                                            ifcProduct.AddPropertySet(Converter.ToIfc(pSet, ifcStore));
+                                        }
+                                    });
+                                }
+                            }
                         });
-                        new DataWriter().writeIfc(ifcStore, outputIfcPath);
+                        txn.Commit();
                     }
                 }
+                List<IfcRelDefinesByProperties> relDefinesByProperties = ifcStore.Instances.OfType<IfcRelDefinesByProperties>().ToList();
+                using (var txn = ifcStore.BeginTransaction("Delete Useless Pset"))
+                {
+                    relDefinesByProperties.ForEach(e =>
+                    {
+                        if (e.RelatedObjects.Count == 0)
+                        {
+                            List<IfcPropertySingleValue> propToDelete = new List<IfcPropertySingleValue>();
+                            foreach (IfcPropertySingleValue ifcPropertySingleValue in (e.RelatingPropertyDefinition as IfcPropertySet).HasProperties)
+                            {
+                                propToDelete.Add(ifcPropertySingleValue);
+                            }
+                            propToDelete.ForEach(p => ifcStore.Delete(p));
+                            ifcStore.Delete(e);
+                            ifcStore.Delete(e.RelatingPropertyDefinition as IfcPropertySet);
+                        }
+                    });
+                    txn.Commit();
+                }
+                new DataWriter().writeIfc(ifcStore, outputIfcPath);
             }
         }
     }

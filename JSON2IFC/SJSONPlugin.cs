@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace JSON2IFC
+namespace Scan2BimConnect.Utilities
 {
-    class SJSONPlugin
+    public class SJSONPlugin
     {
         public class jsonStructure
         {

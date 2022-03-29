@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Scan2BimShared.Models.IfcEntities;
+using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
