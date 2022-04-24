@@ -14,7 +14,6 @@ using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
-using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
@@ -23,16 +22,17 @@ namespace Scan2BimConnect.Utilities
         const double WINDOW_WIDTH = 0.05;
         const double DOOR_WIDTH = 0.07;
         jsonStructure js { get; }
-        public IFCStructureCreater(IfcStore ifcStore, IfcBuilding ifcBuilding, jsonStructure js) : base(ifcStore, ifcBuilding)
+        public IFCStructureCreater(IfcStore ifcStore, IfcBuilding ifcBuilding, jsonStructure? js) : base(ifcStore, ifcBuilding)
         {
-            this.js = js;
+            this.js = js ?? throw new ArgumentNullException("jsonStructure error: empty js");
         }
         public IfcWallType createWallType(Dictionary<string, List<PropertySet>> properties)
         {
             PropertyAgent propertyAgent = new PropertyAgent(ifcStore);
+            properties = properties ?? throw new ArgumentNullException();
             return ifcStore.Instances.New<IfcWallType>(wallType =>
             {
-                if(properties["IfcWallType"] != null) wallType.HasPropertySets.AddRange(properties["IfcWallType"].ConvertAll(props => propertyAgent.generateSet(props)));
+                if (properties["IfcWallType"] != null) wallType.HasPropertySets.AddRange(properties["IfcWallType"].ConvertAll(props => propertyAgent.generateSet(props)));
                 wallType.PredefinedType = IfcWallTypeEnum.NOTDEFINED;
             });
         }
@@ -159,10 +159,13 @@ namespace Scan2BimConnect.Utilities
         }
         public IfcColumn createColumn(jsonColumn jsonColumn, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
-            double length = jsonColumn.length * UNIT_CONVERSION;
-            double width = jsonColumn.width * UNIT_CONVERSION;
-            double height = jsonColumn.height * UNIT_CONVERSION;
-            jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.rotationalAngleInRadius) * UNIT_CONVERSION;
+            jsonColumn.locationPoint = jsonColumn.locationPoint ?? throw new ArgumentNullException("jsonColumn error: empty location");
+
+            double length = jsonColumn.length * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonColumn error: empty length");
+            double width = jsonColumn.width * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonColumn error: empty width");
+            double height = jsonColumn.height * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonColumn error: empty height");
+
+            jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), jsonColumn.rotationalAngleInRadius ?? throw new ArgumentNullException("jsonColumn error: empty rotation")) * UNIT_CONVERSION;
             jsonXYZ locationJsonXYZ = new jsonXYZ(jsonColumn.locationPoint.x, jsonColumn.locationPoint.y, jsonColumn.locationPoint.z) * UNIT_CONVERSION;
             jsonXYZ axisJsonXYZ = jsonXYZ.ZBasis * UNIT_CONVERSION;
             //axis: extrude dir/Z dir; refDirection: width dir/X dir
@@ -181,15 +184,15 @@ namespace Scan2BimConnect.Utilities
                 });
                 column.ObjectPlacement = ifcBuilding.ObjectPlacement;
             });
-            propertyAgent.defineProperties(ifcColumn, new PropertySet() 
+            propertyAgent.defineProperties(ifcColumn, new PropertySet()
             {
                 name = "Dimensional",
-                properties = new List<Property>() 
+                properties = new List<Property>()
                 {
-                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(jsonColumn.height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(jsonColumn.length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(jsonColumn.width * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(jsonColumn.height * jsonColumn.width * jsonColumn.length * UNIT_CONVERSION * UNIT_CONVERSION * UNIT_CONVERSION) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
+                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(height) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(length) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(width) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(height * width * length) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
                 }
             });
             new PropertyAgent(ifcStore).defineProperties(ifcColumn, properties);
@@ -197,14 +200,14 @@ namespace Scan2BimConnect.Utilities
             attachMaterial(ifcColumn, Material.Concrete);
             return ifcColumn;
         }
-        public IfcBeam createBeam(jsonBeam jsonBeam, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
+        public IfcBeam? createBeam(jsonBeam jsonBeam, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
-            double length = jsonBeam.length * UNIT_CONVERSION;
-            double width = jsonBeam.width * UNIT_CONVERSION;
-            double thickness = jsonBeam.height * UNIT_CONVERSION;
-            if (length == 0 || width == 0 || thickness == 0)
+            double length = jsonBeam.length * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonBeam error: empty length");
+            double width = jsonBeam.width * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonBeam error: empty width");
+            double height = jsonBeam.height * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonBeam error: empty height");
+            if (length == 0 || width == 0 || height == 0)
             {
-                Console.WriteLine("Empty Beam: length = " + length + ", width = " + width + ", thickness = " + thickness);
+                Console.WriteLine("Empty Beam: length = " + length + ", width = " + width + ", thickness = " + height);
                 return null;
             }
             jsonXYZ refDirJsonXYZ = (jsonBeam.endPoint - jsonBeam.startPoint).rotate(new jsonXYZ(0, 0, 0), new jsonXYZ(0, 0, 1), Math.PI / 2) * UNIT_CONVERSION;
@@ -221,7 +224,7 @@ namespace Scan2BimConnect.Utilities
                         shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                         shapeRepresentation.RepresentationType = "CSG";
                         shapeRepresentation.RepresentationIdentifier = "Body";
-                        IfcBooleanOperand ifcBooleanOperand = createCuboid(length, width, thickness, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
+                        IfcBooleanOperand ifcBooleanOperand = createCuboid(length, width, height, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
                         shapeRepresentation.Items.Add((IfcRepresentationItem)exclude(excludeReps, ifcBooleanOperand));
                     }));
                 });
@@ -232,10 +235,10 @@ namespace Scan2BimConnect.Utilities
                 name = "Dimensional",
                 properties = new List<Property>()
                 {
-                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(jsonBeam.height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(jsonBeam.length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(jsonBeam.width * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(jsonBeam.height * jsonBeam.width * jsonBeam.length * UNIT_CONVERSION * UNIT_CONVERSION * UNIT_CONVERSION) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
+                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(height) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(length) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(width) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(height * width * length) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
                 }
             });
             new PropertyAgent(ifcStore).defineProperties(ifcBeam, properties);
@@ -245,9 +248,11 @@ namespace Scan2BimConnect.Utilities
         }
         public IfcWall createWall(jsonWall jsonWall, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
+            jsonWall.endPoint = jsonWall.endPoint ?? throw new ArgumentNullException("jsonWall error: empty endPoint");
+            jsonWall.startPoint = jsonWall.startPoint ?? throw new ArgumentNullException("jsonWall error: empty startPoint");
             double length = jsonWall.length * UNIT_CONVERSION;
-            double width = jsonWall.width * UNIT_CONVERSION;
-            double height = jsonWall.height * UNIT_CONVERSION;
+            double width = jsonWall.width * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonWall error: empty height");
+            double height = jsonWall.height * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonWall error: empty height");
             jsonXYZ refDirJsonXYZ = new jsonXYZ((jsonWall.endPoint - jsonWall.startPoint).x, (jsonWall.endPoint - jsonWall.startPoint).y, (jsonWall.endPoint - jsonWall.startPoint).z) * UNIT_CONVERSION;
             jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWall.location.x, jsonWall.location.y, jsonWall.location.z) * UNIT_CONVERSION;
             jsonXYZ axisJsonXYZ = jsonXYZ.ZBasis * UNIT_CONVERSION;
@@ -274,10 +279,10 @@ namespace Scan2BimConnect.Utilities
                 name = "Dimensional",
                 properties = new List<Property>()
                 {
-                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(jsonWall.height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(jsonWall.length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(jsonWall.width * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(jsonWall.height * jsonWall.width * jsonWall.length * UNIT_CONVERSION * UNIT_CONVERSION * UNIT_CONVERSION) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
+                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(width * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(height * width * length) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
                 }
             });
             setAppearance(ifcWall.Representation.Representations.First().Items.First(), style);
@@ -287,9 +292,13 @@ namespace Scan2BimConnect.Utilities
         }
         public IfcWindow createWindow(jsonWindow jsonWindow, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
+            jsonWindow.endPoint = jsonWindow.endPoint ?? throw new ArgumentNullException("jsonWindow error: empty endpoint");
+            jsonWindow.startPoint = jsonWindow.startPoint ?? throw new ArgumentNullException("jsonWindow error: empty startPoint");
+
             double length = jsonWindow.length * UNIT_CONVERSION;
             double width = WINDOW_WIDTH * UNIT_CONVERSION;
-            double height = jsonWindow.height * UNIT_CONVERSION;
+            double shapeWidth = jsonWindow.width * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonWall error: empty width");
+            double height = jsonWindow.height * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonWindow error: empty height");
 
             jsonXYZ refDirJsonXYZ = (jsonWindow.endPoint - jsonWindow.startPoint) * UNIT_CONVERSION;
             jsonXYZ locationJsonXYZ = new jsonXYZ(jsonWindow.location.x, jsonWindow.location.y, jsonWindow.location.z) * UNIT_CONVERSION;
@@ -305,9 +314,9 @@ namespace Scan2BimConnect.Utilities
                         shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                         shapeRepresentation.RepresentationType = "CSG";
                         shapeRepresentation.RepresentationIdentifier = "Body";
-                        IfcBooleanOperand ifcBooleanOperand = createCuboid(height, length, jsonWindow.width * UNIT_CONVERSION, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
+                        IfcBooleanOperand ifcBooleanOperand = createCuboid(height, length, shapeWidth, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
                         cutReps(excludeReps, ifcBooleanOperand);
-                        shapeRepresentation.Items.Add(createCuboid(height, length, WINDOW_WIDTH * UNIT_CONVERSION, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ));
+                        shapeRepresentation.Items.Add(createCuboid(height, length, width, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ));
                     }));
                 });
                 window.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -318,10 +327,10 @@ namespace Scan2BimConnect.Utilities
                 name = "Dimensional",
                 properties = new List<Property>()
                 {
-                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(jsonWindow.height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(jsonWindow.length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
                     { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(WINDOW_WIDTH * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(jsonWindow.height * WINDOW_WIDTH * jsonWindow.length * UNIT_CONVERSION * UNIT_CONVERSION * UNIT_CONVERSION) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
+                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(height * WINDOW_WIDTH * length) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } }
                 }
             });
             setAppearance(ifcWindow.Representation.Representations.First().Items.First(), style);
@@ -331,9 +340,12 @@ namespace Scan2BimConnect.Utilities
         }
         public IfcDoor createDoor(jsonDoor jsonDoor, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
+            jsonDoor.endPoint = jsonDoor.endPoint ?? throw new ArgumentNullException("jsonDoor error: empty endpoint");
+            jsonDoor.startPoint = jsonDoor.startPoint ?? throw new ArgumentNullException("jsonDoor error: empty startPoint");
             double length = jsonDoor.length * UNIT_CONVERSION;
             double width = DOOR_WIDTH * UNIT_CONVERSION;
-            double height = jsonDoor.height * UNIT_CONVERSION;
+            double shapeWidth = jsonDoor.width * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonDoor error: empty width");
+            double height = jsonDoor.height * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonDoor error: empty height");
 
             jsonXYZ refDirJsonXYZ = (jsonDoor.endPoint - jsonDoor.startPoint) * UNIT_CONVERSION;
             jsonXYZ locationJsonXYZ = new jsonXYZ(jsonDoor.location.x, jsonDoor.location.y, jsonDoor.location.z) * UNIT_CONVERSION;
@@ -349,7 +361,7 @@ namespace Scan2BimConnect.Utilities
                         shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                         shapeRepresentation.RepresentationType = "CSG";
                         shapeRepresentation.RepresentationIdentifier = "Body";
-                        IfcBooleanOperand ifcBooleanOperand = createCuboid(height, length, jsonDoor.width * UNIT_CONVERSION, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
+                        IfcBooleanOperand ifcBooleanOperand = createCuboid(height, length, shapeWidth, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ);
                         cutReps(excludeReps, ifcBooleanOperand);
                         shapeRepresentation.Items.Add(createCuboid(height, length, width, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ));
                     }));
@@ -362,10 +374,10 @@ namespace Scan2BimConnect.Utilities
                 name = "Dimensional",
                 properties = new List<Property>()
                 {
-                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(jsonDoor.height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(jsonDoor.length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Height", type = "IfcLengthMeasure", value = (Math.Truncate(height * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Length", type = "IfcLengthMeasure", value = (Math.Truncate(length * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
                     { new Property(){name = "Width", type = "IfcLengthMeasure", value = (Math.Truncate(DOOR_WIDTH * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } },
-                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(jsonDoor.height * DOOR_WIDTH * jsonDoor.length * UNIT_CONVERSION * UNIT_CONVERSION * UNIT_CONVERSION) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } },
+                    { new Property(){name = "Volume", type = "IfcVolumeMeasure", value = (Math.Truncate(height * DOOR_WIDTH * length) / UNIT_CONVERSION / UNIT_CONVERSION / UNIT_CONVERSION).ToString() } },
                 }
             });
             setAppearance(ifcDoor.Representation.Representations.First().Items.First(), style);
@@ -375,10 +387,12 @@ namespace Scan2BimConnect.Utilities
         }
         public Tuple<IfcSlab, IfcSlab> createSlab(jsonSlab jsonSlab, List<IfcRepresentation> excludeReps, Dictionary<string, List<PropertySet>> properties, KeyValuePair<BuildingComponent, Style> style)
         {
-            double thickness = jsonSlab.thickness * UNIT_CONVERSION;
+            jsonSlab.baseProfile = jsonSlab.baseProfile ?? throw new ArgumentNullException("jsonSlab error: empty baseprofile");
+            double thickness = jsonSlab.thickness * UNIT_CONVERSION ?? throw new ArgumentNullException("jsonSlab error: empty thickness");
             jsonXYZ refDirJsonXYZ = new jsonXYZ(1, 0, 0) * UNIT_CONVERSION;
             jsonXYZ locationJsonXYZ = jsonSlab.location * UNIT_CONVERSION;
             jsonXYZ axisJsonXYZ = new jsonXYZ(0, 0, 1) * UNIT_CONVERSION;
+            double height = jsonSlab.bottom ?? throw new ArgumentNullException("Slab Empty bottom");//(js.Wall ?? throw new ArgumentNullException("Creating slab error: empty walls"))[0].height ?? throw new ArgumentNullException("wall empty height");
             //axis: extrude dir/Z dir; refDirection: width dir/X dir
             //showcase appearance
             IfcSlab ifcSlab1 = ifcStore.Instances.New<IfcSlab>(slab =>
@@ -406,7 +420,7 @@ namespace Scan2BimConnect.Utilities
                         shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                         shapeRepresentation.RepresentationType = "SweptSolid";
                         shapeRepresentation.RepresentationIdentifier = "Body";
-                        shapeRepresentation.Items.Add(createArbitrary(thickness, jsonSlab.baseProfile, locationJsonXYZ + jsonXYZ.ZBasis * (js.Wall[0].height + jsonSlab.thickness) * UNIT_CONVERSION, axisJsonXYZ, refDirJsonXYZ));
+                        shapeRepresentation.Items.Add(createArbitrary(thickness, jsonSlab.baseProfile, locationJsonXYZ + jsonXYZ.ZBasis * (height * UNIT_CONVERSION + thickness), axisJsonXYZ, refDirJsonXYZ));
                     }));
                 });
                 slab.ObjectPlacement = ifcBuilding.ObjectPlacement;
@@ -416,7 +430,7 @@ namespace Scan2BimConnect.Utilities
                 name = "Dimensional",
                 properties = new List<Property>()
                 {
-                    { new Property(){name = "Thickness", type = "IfcLengthMeasure", value = (Math.Truncate(jsonSlab.thickness * UNIT_CONVERSION) / UNIT_CONVERSION).ToString() } }
+                    { new Property(){name = "Thickness", type = "IfcLengthMeasure", value = (Math.Truncate(thickness) / UNIT_CONVERSION).ToString() } }
                 }
             });
             new PropertyAgent(ifcStore).defineProperties(ifcSlab2, properties);

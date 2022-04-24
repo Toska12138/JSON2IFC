@@ -19,20 +19,19 @@ using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.RepresentationResource;
 using Xbim.Ifc4.SharedBldgElements;
 using Xbim.IO;
-using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
     public static class Json2IfcHelper
     {
-        public static string error_msg;
+        public static string error_msg = string.Empty;
         public const double UNIT_CONVERSION = 1000;
         public static Result GenerateIFC(XbimSchemaVersion release, string outputIfcFilePath, string structureFilePath, string mepFilePath, string ductFilePath, string beamFilePath, string propertiesPath, string appearancePath)
         {
-            if(!string.IsNullOrEmpty(appearancePath) && File.Exists(appearancePath))
+
+            if (!string.IsNullOrEmpty(appearancePath) && File.Exists(appearancePath))
             {
-                Dictionary<BuildingComponent, Style> appearance = new DataReader().readAppearance(appearancePath);
-                IFCElementCreater.appearance = appearance;
+                IFCElementCreater.appearance = new DataReader().readAppearance(appearancePath) ?? IFCElementCreater.appearance;
             }
             Result res = new Result(0);
             DataReader dataReader = new DataReader();
@@ -43,12 +42,36 @@ namespace Scan2BimConnect.Utilities
                 {
                     TemplateBuilder templateBuilder = new TemplateBuilder(ifcStore);
 
+                    IfcProject ifcProject = ifcStore.Instances.OfType<IfcProject>().First() ?? throw new ArgumentNullException("Failed to find ifcproject");
                     IfcBuilding ifcBuilding = createBuilding(ifcStore, "Building");
                     IfcBuildingStorey ifcBuildingStorey = createStorey(ifcBuilding);
 
+                    templateBuilder.metaModel.metaObjects.Add(new MetaObject()
+                    {
+                        id = ifcProject.GlobalId,
+                        name = ifcProject.Name,
+                        type = ifcProject.GetType().Name
+                    });
+
+                    templateBuilder.metaModel.metaObjects.Add(new MetaObject()
+                    {
+                        id = ifcBuilding.GlobalId,
+                        name = ifcBuilding.Name,
+                        type = ifcBuilding.GetType().Name,
+                        parent = ifcProject.GlobalId
+                    });
+
+                    templateBuilder.metaModel.metaObjects.Add(new MetaObject()
+                    {
+                        id = ifcBuildingStorey.GlobalId,
+                        name = ifcBuildingStorey.Name,
+                        type = ifcBuildingStorey.GetType().Name,
+                        parent = ifcBuilding.GlobalId
+                    });
+
                     if (!string.IsNullOrEmpty(structureFilePath) && File.Exists(structureFilePath))
                     {
-                        jsonStructure js = dataReader.readJSONStructure(structureFilePath);
+                        jsonStructure js = dataReader.readJSONStructure(structureFilePath) ?? throw new ArgumentNullException("Failed to read jsonStructure");
 
                         List<IfcColumn> ifcColumns = new List<IfcColumn>();
                         List<IfcBeam> ifcBeams = new List<IfcBeam>();
@@ -65,7 +88,7 @@ namespace Scan2BimConnect.Utilities
                         Dictionary<string, List<PropertySet>> general_properties = PropertyAgent.defaultProperties;
                         if (!string.IsNullOrEmpty(propertiesPath) && File.Exists(propertiesPath))
                         {
-                            general_properties = dataReader.readProperties(propertiesPath);
+                            general_properties = dataReader.readProperties(propertiesPath) ?? PropertyAgent.defaultProperties;
                         }
 
                         using (var txn = ifcStore.BeginTransaction("Create Columns"))
@@ -74,7 +97,7 @@ namespace Scan2BimConnect.Utilities
                             if (js.Column != null)
                             {
                                 res.noElements += js.Column.Length;
-                                js.Column.ToList().ForEach(e => 
+                                js.Column.ToList().ForEach(e =>
                                 {
                                     ifcColumns.Add(iFCStructureCreater.createColumn(e, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Column)));
                                 });
@@ -95,7 +118,8 @@ namespace Scan2BimConnect.Utilities
                                 res.noElements += js.Beam.Length;
                                 js.Beam.ToList().ForEach(e =>
                                 {
-                                    ifcBeams.Add(iFCStructureCreater.createBeam(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam)));
+                                    IfcBeam? ifcbeam = iFCStructureCreater.createBeam(e, excludeReps, general_properties, IFCElementCreater.appearance.First(p => p.Key == BuildingComponent.Beam));
+                                    if (ifcbeam != null) ifcBeams.Add(ifcbeam);
                                 });
                                 IfcRelDefinesByType ifcRelDefinesByType = ifcStore.Instances.New<IfcRelDefinesByType>(relDefinesByType =>
                                 {
@@ -110,7 +134,7 @@ namespace Scan2BimConnect.Utilities
                         if (!string.IsNullOrEmpty(beamFilePath) && File.Exists(beamFilePath))
                         {
                             //create beams from seperate files
-                            jsonBeam[] jb = dataReader.readJSONStructure(beamFilePath).Beam;
+                            jsonBeam[] jb = (dataReader.readJSONStructure(beamFilePath) ?? throw new ArgumentNullException("Failed to load external jsonBeam")).Beam ?? throw new ArgumentNullException("external jsonBeam error: empty Beam");
                             using (var txn = ifcStore.BeginTransaction("Create Beams"))
                             {
                                 //create beams
@@ -125,17 +149,20 @@ namespace Scan2BimConnect.Utilities
                                 });
                                 foreach (jsonBeam jsonBeam in jb)
                                 {
-                                    double length = jsonBeam.length * 1000;
-                                    double width = jsonBeam.width * 1000;
-                                    double thickness = jsonBeam.startPointInfile.distanceTo(jsonBeam.endPointInfile) * 1000;
+                                    jsonBeam.startPointInfile = jsonBeam.startPointInfile ?? throw new ArgumentNullException("external beam error: empty startpoint");
+                                    jsonBeam.endPointInfile = jsonBeam.endPointInfile ?? throw new ArgumentNullException("external beam error: empty endpoint");
+                                    jsonBeam.lengthDirection = jsonBeam.lengthDirection ?? throw new ArgumentNullException("external beam error: empty lengthDirection");
+                                    double length = jsonBeam.length * UNIT_CONVERSION ?? throw new ArgumentNullException("external Beam error: empty length");
+                                    double width = jsonBeam.width * UNIT_CONVERSION ?? throw new ArgumentNullException("external Beam error: empty width");
+                                    double thickness = jsonBeam.startPointInfile.distanceTo(jsonBeam.endPointInfile) * UNIT_CONVERSION;
                                     if (length == 0 || width == 0 || thickness == 0)
                                     {
                                         error_msg += "Empty Beam: length = " + length + ", width = " + width + ", thickness = " + thickness;
                                         continue;
                                     }
-                                    jsonXYZ refDirJsonXYZ = jsonBeam.lengthDirection * 1000;
-                                    jsonXYZ locationJsonXYZ = jsonBeam.startPointInfile * 1000;
-                                    jsonXYZ axisJsonXYZ = (jsonBeam.endPointInfile - jsonBeam.startPointInfile) * 1000;
+                                    jsonXYZ refDirJsonXYZ = jsonBeam.lengthDirection * UNIT_CONVERSION;
+                                    jsonXYZ locationJsonXYZ = jsonBeam.startPointInfile * UNIT_CONVERSION;
+                                    jsonXYZ axisJsonXYZ = (jsonBeam.endPointInfile - jsonBeam.startPointInfile) * UNIT_CONVERSION;
                                     //axis: extrude dir/Z dir; refDirection: width dir/X dir
 
                                     IfcBeam ifcBeam = ifcStore.Instances.New<IfcBeam>(beam =>
@@ -257,7 +284,7 @@ namespace Scan2BimConnect.Utilities
                             }
                             txn.Commit();
                         }
-                        using (var txn = ifcStore.BeginTransaction("Create Slabs")) 
+                        using (var txn = ifcStore.BeginTransaction("Create Slabs"))
                         {
                             if (js.Slab != null)
                             {
@@ -287,9 +314,9 @@ namespace Scan2BimConnect.Utilities
                         ifcProducts.AddRange(ifcWindows);
                         ifcProducts.AddRange(ifcSlabs);
 
-                        using (var txn = ifcStore.BeginTransaction(""))
+                        using (var txn = ifcStore.BeginTransaction("Add structral components"))
                         {
-                            templateBuilder.addObjects(ifcProducts);
+                            templateBuilder.addObjects(ifcProducts, ifcBuildingStorey);
                             ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
                             foreach (IfcProduct ifcProduct in ifcProducts)
                             {
@@ -300,8 +327,8 @@ namespace Scan2BimConnect.Utilities
                     }
                     if (!string.IsNullOrEmpty(mepFilePath) && File.Exists(mepFilePath))
                     {
-                        jsonMEP jmep = dataReader.readJSONMEP(mepFilePath);
-                        res.noElements += jmep.Elbow_Pipe_Junction.Length + jmep.pipe.Length + jmep.T_Pipe_Junction.Length;
+                        jsonMEP jmep = dataReader.readJSONMEP(mepFilePath) ?? throw new ArgumentNullException("Failed to load mepFIle");
+                        // res.noElements += jmep.Elbow_Pipe_Junction.Length + jmep.pipe.Length + jmep.T_Pipe_Junction.Length;
                         List<IIfcFlowSegment> ifcFlowSegments = new List<IIfcFlowSegment>();
                         List<IIfcFlowFitting> ifcPipeEllbows = new List<IIfcFlowFitting>();
                         List<IIfcFlowFitting> ifcPipeTFittings = new List<IIfcFlowFitting>();
@@ -309,7 +336,7 @@ namespace Scan2BimConnect.Utilities
                         List<IIfcFlowFitting> ifcPipe_P_Traps = new List<IIfcFlowFitting>();
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
 
-                        IFCMEPCreater iFCMEPCreater = new IFCMEPCreater(jmep, ifcStore, ifcBuilding);
+                        IFCMEPCreater iFCMEPCreater = new IFCMEPCreater(jmep, null, ifcStore, ifcBuilding);
                         iFCMEPCreater.MEPAdjuster.adjustPipeElbow();
                         iFCMEPCreater.MEPAdjuster.adjustPipeTee();
                         iFCMEPCreater.MEPAdjuster.adjustPipeSTrap();
@@ -370,9 +397,9 @@ namespace Scan2BimConnect.Utilities
                         ifcProducts.AddRange(ifcPipe_S_Traps.ConvertAll(e => (IfcProduct)e));
                         ifcProducts.AddRange(ifcPipe_P_Traps.ConvertAll(e => (IfcProduct)e));
 
-                        using (var txn = ifcStore.BeginTransaction(""))
+                        using (var txn = ifcStore.BeginTransaction("Add mep components"))
                         {
-                            templateBuilder.addObjects(ifcProducts);
+                            templateBuilder.addObjects(ifcProducts, ifcBuildingStorey);
                             ifcBuilding.AddToSpatialDecomposition(ifcBuildingStorey);
                             foreach (IfcProduct ifcProduct in ifcProducts)
                             {
@@ -383,13 +410,13 @@ namespace Scan2BimConnect.Utilities
                     }
                     if (!string.IsNullOrEmpty(ductFilePath) && File.Exists(ductFilePath))
                     {
-                        jsonM jm = dataReader.readJSONM(ductFilePath);
+                        jsonM jm = dataReader.readJSONM(ductFilePath) ?? throw new ArgumentNullException("Failed to load ductfile");
                         List<IfcDuctSegment> ifcDuctSegments = new List<IfcDuctSegment>();
                         List<IfcDuctFitting> ifcDuctEllbows = new List<IfcDuctFitting>();
                         List<IfcDuctFitting> ifcDuctTFitting = new List<IfcDuctFitting>();
                         List<jsonDuct> ducts = new List<jsonDuct>();
 
-                        IFCMEPCreater iFCMEPCreater = new IFCMEPCreater(jm, ifcStore, ifcBuilding);
+                        IFCMEPCreater iFCMEPCreater = new IFCMEPCreater(null, jm, ifcStore, ifcBuilding);
 
                         if (jm.duct != null)
                         {
@@ -398,9 +425,9 @@ namespace Scan2BimConnect.Utilities
 
                         List<IfcProduct> ifcProducts = new List<IfcProduct>();
 
-                        using (var txn = ifcStore.BeginTransaction("Create Ducts"))
+                        using (var txn = ifcStore.BeginTransaction("Add Ducts"))
                         {
-                             templateBuilder.addObjects(ifcProducts);
+                            templateBuilder.addObjects(ifcProducts, ifcBuildingStorey);
                             if (jm.duct != null)
                             {
                                 ifcDuctSegments.AddRange(iFCMEPCreater.createDucts());
@@ -459,7 +486,7 @@ namespace Scan2BimConnect.Utilities
                 var project = model.Instances.New<IfcProject>();
                 project.Initialize(ProjectUnits.SIUnitsUK);
                 project.Name = projectName;
-                
+
                 txn.Commit();
             }
             return model;

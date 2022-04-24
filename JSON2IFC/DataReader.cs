@@ -6,7 +6,6 @@ using System.Text.Json.Serialization;
 using Scan2BimShared.Models;
 using Scan2BimShared.Models.IfcEntities;
 using Scan2BimShared.StaticData.IfcEnums;
-using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
@@ -16,7 +15,7 @@ namespace Scan2BimConnect.Utilities
         {
 
         }
-        public jsonStructure readJSONStructure(string strReadFilePath)
+        public jsonStructure? readJSONStructure(string strReadFilePath)
         {
             StreamReader srReadFile = new StreamReader(strReadFilePath);
             string jsonText = "";
@@ -24,13 +23,13 @@ namespace Scan2BimConnect.Utilities
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonStructure jo = JsonSerializer.Deserialize<jsonStructure>(jsonText, new JsonSerializerOptions
+            jsonStructure? jo = JsonSerializer.Deserialize<jsonStructure>(jsonText, new JsonSerializerOptions
             {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             });
             return jo;
         }
-        public jsonMEP readJSONMEP(string strReadFilePath)
+        public jsonMEP? readJSONMEP(string strReadFilePath)
         {
             StreamReader srReadFile = new StreamReader(strReadFilePath);
             string jsonText = "";
@@ -38,14 +37,14 @@ namespace Scan2BimConnect.Utilities
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonMEP jo = JsonSerializer.Deserialize<jsonMEP>(jsonText, new JsonSerializerOptions
+            jsonMEP? jo = JsonSerializer.Deserialize<jsonMEP>(jsonText, new JsonSerializerOptions
             {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString,
                 PropertyNameCaseInsensitive = true,
             });
             return jo;
         }
-        public jsonM readJSONM(string strReadFilePath)
+        public jsonM? readJSONM(string strReadFilePath)
         {
             StreamReader srReadFile = new StreamReader(strReadFilePath);
             string jsonText = "";
@@ -53,14 +52,14 @@ namespace Scan2BimConnect.Utilities
             {
                 jsonText += srReadFile.ReadLine();
             }
-            jsonM jo = JsonSerializer.Deserialize<jsonM>(jsonText, new JsonSerializerOptions
+            jsonM? jo = JsonSerializer.Deserialize<jsonM>(jsonText, new JsonSerializerOptions
             {
                 NumberHandling = JsonNumberHandling.AllowReadingFromString,
                 PropertyNameCaseInsensitive = true,
             });
             return jo;
         }
-        public Dictionary<string, List<PropertySet>> readProperties(string path)
+        public Dictionary<string, List<PropertySet>>? readProperties(string path)
         {
             StreamReader srReadFile = new StreamReader(path);
             string jsonText = "";
@@ -75,7 +74,7 @@ namespace Scan2BimConnect.Utilities
             //new DataWriter().writeJson(o, path + ".json");
             return JsonSerializer.Deserialize<Dictionary<string, List<PropertySet>>>(jsonText, serializeOptions);
         }
-        public MetaModel readMetaData(string path)
+        public MetaModel? readMetaData(string path)
         {
             StreamReader srReadFile = new StreamReader(path);
             string jsonText = "";
@@ -109,7 +108,7 @@ namespace Scan2BimConnect.Utilities
                 }
                 else if (reader.TokenType == JsonTokenType.String)
                 {
-                    return reader.GetString();
+                    return reader.GetString() ?? "<null>";
                 }
                 Console.WriteLine(reader.TokenType.ToString());
                 throw new System.Text.Json.JsonException();
@@ -121,7 +120,7 @@ namespace Scan2BimConnect.Utilities
             }
 
         }
-        public Dictionary<BuildingComponent, Style> readAppearance(string path)
+        public Dictionary<BuildingComponent, Style>? readAppearance(string path)
         {
             StreamReader srReadFile = new StreamReader(path);
             string jsonText = "";

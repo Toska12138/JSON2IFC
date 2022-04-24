@@ -101,7 +101,7 @@ namespace Scan2BimConnect.Utilities
                         {
                             surfaceStyleRendering.SurfaceColour = ifcStore.Instances.New<IfcColourRgb>(colorRGB =>
                             {
-                                colorRGB.Red = pair.Value.RGB[0];
+                                colorRGB.Red = (pair.Value.RGB ?? throw new NullReferenceException("Null RGB value"))[0];
                                 colorRGB.Green = pair.Value.RGB[1];
                                 colorRGB.Blue = pair.Value.RGB[2];
                             });

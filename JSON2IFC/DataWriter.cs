@@ -19,7 +19,7 @@ namespace Scan2BimConnect.Utilities
         }
         public Boolean WriteError(string s, string path)
         {
-            FileStream fs = new FileStream(Path.Combine(path, "Error.txt"), FileMode.Create);
+            FileStream fs = new FileStream(path + ".Error.txt", FileMode.Create);
             byte[] data = System.Text.Encoding.Default.GetBytes(s);
             fs.Write(data, 0, data.Length);
             fs.Flush();

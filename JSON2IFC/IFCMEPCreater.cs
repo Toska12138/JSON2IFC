@@ -13,33 +13,25 @@ using Xbim.Ifc4.MeasureResource;
 using Xbim.Ifc4.ProductExtension;
 using Xbim.Ifc4.ProfileResource;
 using Xbim.Ifc4.RepresentationResource;
-using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
     class IFCMEPCreater : IFCElementCreater
     {
-        jsonMEP jmep { get; }
-        jsonM jm { get; }
-        List<jsonPipe> pipes { get; }
+        jsonMEP? jmep { get; set; }
+        jsonM? jm { get; set; }
         public MEPAdjuster MEPAdjuster { get; set; }
-        public IFCMEPCreater(jsonMEP jmep, IfcStore ifcStore, IfcBuilding ifcBuilding) : base(ifcStore, ifcBuilding)
+        public IFCMEPCreater(jsonMEP? jmep, jsonM? jm, IfcStore ifcStore, IfcBuilding ifcBuilding) : base(ifcStore, ifcBuilding)
         {
             this.jmep = jmep;
-            this.jm = null;
-            this.MEPAdjuster = new MEPAdjuster(jmep);
-            this.pipes = jmep.pipe.ToList();
-        }
-        public IFCMEPCreater(jsonM jm, IfcStore ifcStore, IfcBuilding ifcBuilding) : base(ifcStore, ifcBuilding)
-        {
-            this.jmep = null;
             this.jm = jm;
-            this.MEPAdjuster = new MEPAdjuster(jm);
+            this.MEPAdjuster = new MEPAdjuster(jmep, jm);
         }
         public List<IIfcFlowSegment> createPipes()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMEP Error: Empty jmep");
             List<IIfcFlowSegment> ret = new List<IIfcFlowSegment>();
-            foreach (jsonPipe jsonPipe in jmep.pipe)
+            foreach (jsonPipe jsonPipe in jmep.pipe ?? throw new ArgumentNullException("jsonPipe Error: Empty Pipes"))
             {
                 if (jsonPipe.length == 0)
                 {
@@ -47,8 +39,11 @@ namespace Scan2BimConnect.Utilities
                     continue;
                 }
 
+                jsonPipe.startPoint = jsonPipe.startPoint ?? throw new ArgumentException("jsonPipe Error: Empty startPoint");
+                jsonPipe.endPoint = jsonPipe.endPoint ?? throw new ArgumentException("jsonPipe Error: Empty endPoint");
+
                 double length = jsonPipe.length * UNIT_CONVERSION;
-                double radius = jsonPipe.radius * UNIT_CONVERSION;
+                double radius = jsonPipe.radius * UNIT_CONVERSION ?? throw new ArgumentException("jsonPipe Error: Empty radius " + jsonPipe.ID);
                 jsonXYZ locationJsonXYZ = new jsonXYZ(jsonPipe.startPoint.x, jsonPipe.startPoint.y, jsonPipe.startPoint.z) * UNIT_CONVERSION;
                 jsonXYZ axisJsonXYZ = new jsonXYZ((jsonPipe.endPoint - jsonPipe.startPoint).x, (jsonPipe.endPoint - jsonPipe.startPoint).y, (jsonPipe.endPoint - jsonPipe.startPoint).z) * UNIT_CONVERSION;
                 jsonXYZ refDirJsonXYZ = !(axisJsonXYZ.x == 0 && axisJsonXYZ.y == 0) ? (new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION) : (new jsonXYZ(axisJsonXYZ.z, 0, -axisJsonXYZ.x) * UNIT_CONVERSION);
@@ -76,16 +71,20 @@ namespace Scan2BimConnect.Utilities
         }
         public List<IIfcFlowFitting> createPipeElbows()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMEP Error: Empty jmep");
             List<IIfcFlowFitting> ret = new List<IIfcFlowFitting>();
-            jsonPipe pipe1 = null, pipe2 = null;
-            foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction)
+            foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction ?? throw new ArgumentNullException("jsonPipe Error: Empty Elbows"))
             {
-                pipe1 = pipes.Find(x => x.ID == jsonFitting.pipe_index_1);
-                pipe2 = pipes.Find(x => x.ID == jsonFitting.pipe_index_2);
-                if (pipe1 != null && pipe2 != null && jsonFitting.isValid)
+                jmep.pipe = jmep.pipe ?? throw new ArgumentNullException("jsonMep Error: empty pipes");
+                //jsonPipe pipe1 = jmep.pipe.ToList().Find(x => x.ID == jsonFitting.pipe_index_1) ?? throw new ArgumentNullException("Couldn't find pipe with id: " + jsonFitting.pipe_index_1);
+                //jsonPipe pipe2 = jmep.pipe.ToList().Find(x => x.ID == jsonFitting.pipe_index_2) ?? throw new ArgumentNullException("Couldn't find pipe with id: " + jsonFitting.pipe_index_2);
+                if (jsonFitting.isValid ?? throw new ArgumentNullException("Operation Error: Empty Fitting Validation"))
                 {
-                    double angle = jsonFitting.angle;
-                    double radius = jsonFitting.radius * UNIT_CONVERSION;
+                    double angle = jsonFitting.angle ?? throw new ArgumentException("jsonFitting Error: Empty angle");
+                    double radius = jsonFitting.radius * UNIT_CONVERSION ?? throw new ArgumentException("jsonFitting Error: Empty radius");
+                    jsonFitting.center = jsonFitting.center ?? throw new ArgumentNullException("Operation Error: Empty center");
+                    jsonFitting.location = jsonFitting.location ?? throw new ArgumentNullException("Operation Error: Empty location");
+                    jsonFitting.refAxis = jsonFitting.refAxis ?? throw new ArgumentNullException("Operation Error: Empty refAxis");
                     jsonXYZ rotationAxis = jsonXYZ.YBasis * UNIT_CONVERSION;
                     jsonXYZ rotationCenter = jsonFitting.center.distanceTo(jsonFitting.location) * jsonXYZ.XBasis * UNIT_CONVERSION;
 
@@ -121,20 +120,23 @@ namespace Scan2BimConnect.Utilities
         }
         public List<IIfcFlowFitting> createPipeTee()
         {
-            jsonPipe pipe1 = null, pipe2 = null, pipe3 = null;
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMEP Error: Empty jmep");
             List<IIfcFlowFitting> ret = new List<IIfcFlowFitting>();
-            foreach (jsonTee jsonTee in jmep.T_Pipe_Junction)
+            foreach (jsonTee jsonTee in jmep.T_Pipe_Junction ?? throw new ArgumentNullException("jsonMep error: empty tees"))
             {
-                pipe1 = pipes.Find(x => x.ID == jsonTee.pipe_index_1);
-                pipe2 = pipes.Find(x => x.ID == jsonTee.pipe_index_2);
-                pipe3 = pipes.Find(x => x.ID == jsonTee.pipe_index_3);
-                if (pipe1 != null && pipe2 != null && pipe3 != null && jsonTee.isValid)
+                List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
+                // jsonPipe pipe1 = pipes.Find(x => x.ID == jsonTee.pipe_index_1) ?? throw new ArgumentNullException("Couldn't find pipe with id: " + jsonTee.pipe_index_1);
+                // jsonPipe pipe2 = pipes.Find(x => x.ID == jsonTee.pipe_index_2) ?? throw new ArgumentNullException("Couldn't find pipe with id: " + jsonTee.pipe_index_2);
+                // jsonPipe pipe3 = pipes.Find(x => x.ID == jsonTee.pipe_index_3) ?? throw new ArgumentNullException("Couldn't find pipe with id: " + jsonTee.pipe_index_3);
+                if (jsonTee.isValid ?? throw new ArgumentNullException("Operation Error: Empty validation value"))
                 {
-                    List<jsonXYZ> pts = new List<jsonXYZ>() { jsonTee.Pt1, jsonTee.Pt2, jsonTee.Pt3 };
-                    List<jsonPipe> connectedPipes = new List<jsonPipe>() { pipe1, pipe2, pipe3 };
+                    // jsonTee.Pt1 = jsonTee.Pt1 ?? throw new ArgumentNullException("Operation Error: Empty Pt1");
+                    // jsonTee.Pt2 = jsonTee.Pt2 ?? throw new ArgumentNullException("Operation Error: Empty Pt2");
+                    // jsonTee.Pt3 = jsonTee.Pt3 ?? throw new ArgumentNullException("Operation Error: Empty Pt3");
+
                     double radius;
                     double depth;
-                    jsonXYZ locationJsonXYZ = null, axisJsonXYZ = null, refDirJsonXYZ = null;
+                    jsonXYZ locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ;
 
                     //axis: Z dir; refDirection: X dir
                     IIfcFlowFitting ifcFlowFitting = new Create(ifcStore).FlowFitting(flowFitting =>
@@ -146,13 +148,14 @@ namespace Scan2BimConnect.Utilities
                             {
                                 shapeRepresentation.ContextOfItems = ifcStore.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
                                 shapeRepresentation.RepresentationIdentifier = "Body";
-                                var zip = pts.Zip(connectedPipes, (pt, pipe) => new { pt, pipe });
-                                foreach (var z in zip)
+                                foreach (var segment in jsonTee.segments ?? throw new ArgumentNullException("Operation Error: tee null segemts"))
                                 {
-                                    radius = z.pipe.radius * UNIT_CONVERSION * jsonTee.config.Radius_ratio;
-                                    depth = z.pt.distanceTo(jsonTee.center) * UNIT_CONVERSION;
-                                    locationJsonXYZ = z.pt * UNIT_CONVERSION;
-                                    axisJsonXYZ = (jsonTee.center - z.pt) * UNIT_CONVERSION;
+                                    var seg = segment ?? throw new ArgumentNullException("Opeartion Error: tee null segement");
+                                    jsonXYZ pt = seg.Item1 ?? throw new ArgumentNullException("Opeartion Error: segment null pt");
+                                    radius = seg.Item2 * UNIT_CONVERSION * jsonTee.config.Radius_ratio ?? throw new ArgumentNullException("Operation Error: segemt null radius");
+                                    depth = pt.distanceTo(jsonTee.center ?? throw new ArgumentNullException("Operation Error: Empty center")) * UNIT_CONVERSION;
+                                    locationJsonXYZ = pt * UNIT_CONVERSION;
+                                    axisJsonXYZ = (jsonTee.center - pt) * UNIT_CONVERSION;
                                     refDirJsonXYZ = !(axisJsonXYZ.x == 0 && axisJsonXYZ.y == 0) ? (new jsonXYZ(axisJsonXYZ.y, -axisJsonXYZ.x, 0) * UNIT_CONVERSION) : (new jsonXYZ(axisJsonXYZ.z, 0, axisJsonXYZ.x) * UNIT_CONVERSION);
                                     shapeRepresentation.Items.Add(createCylinder(depth, radius, locationJsonXYZ, axisJsonXYZ, refDirJsonXYZ, appearance.First(p => p.Key == BuildingComponent.pipeTee)));
                                 }
@@ -168,11 +171,15 @@ namespace Scan2BimConnect.Utilities
         }
         public List<IIfcFlowFitting> createPipeSTrap()
         {
-            jsonPipe pipe = null;
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMEP Error: Empty jmep");
             List<IIfcFlowFitting> ret = new List<IIfcFlowFitting>();
-            foreach (jsonS_Trap jsonS_Trap in jmep.S_Trap)
+            foreach (jsonS_Trap jsonS_Trap in jmep.S_Trap ?? throw new ArgumentNullException("jsonMep error: empty Straps"))
             {
-                pipe = pipes.Find(x => x.ID == jsonS_Trap.Pipe_Index);
+                List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
+                jsonS_Trap.Startpoint = jsonS_Trap.Startpoint ?? throw new ArgumentNullException("jsonS error: empty sartpoint");
+                jsonS_Trap.Vertical_direction = jsonS_Trap.Vertical_direction ?? throw new ArgumentNullException("jsonS error: empty Vertical_direction");
+                jsonS_Trap.Span_direction = jsonS_Trap.Span_direction ?? throw new ArgumentNullException("jsonS error: empty Span_direction");
+                jsonPipe pipe = pipes.Find(x => x.ID == jsonS_Trap.Pipe_Index) ?? throw new ArgumentNullException("Coudln't find pipe with index: " + jsonS_Trap.Pipe_Index);
                 jsonXYZ locationJsonXYZ = jsonS_Trap.Startpoint;
                 jsonXYZ axisJsonXYZ = jsonS_Trap.Vertical_direction.normalized();
                 jsonXYZ refDirJsonXYZ = (jsonS_Trap.Span_direction - jsonS_Trap.Span_direction.projectTo(jsonXYZ.Zero, jsonS_Trap.Vertical_direction)).normalized();
@@ -187,15 +194,9 @@ namespace Scan2BimConnect.Utilities
                 double revolving_cutratio = jsonS_Trap.config.revolving_ratio / Math.Tan(revolving_angle / 2);
                 double radius = jsonS_Trap.Radius * UNIT_CONVERSION;
 
-                jsonXYZ temp_location = null;
-                jsonXYZ temp_axis = null;
-                jsonXYZ temp_ref = null;
-
+                jsonXYZ temp_location, temp_axis, temp_ref, rotationAxis, rotationCenter;
                 double depth = 0.0;
                 double angle = 0.0;
-
-                jsonXYZ rotationAxis = null;
-                jsonXYZ rotationCenter = null;
 
                 KeyValuePair<BuildingComponent, Style> S_trap_appearance = appearance.First(p => p.Key == BuildingComponent.S_trap);
 
@@ -241,7 +242,7 @@ namespace Scan2BimConnect.Utilities
                             temp_ref = temp_ref.normalized() * UNIT_CONVERSION;
                             rotationAxis = jsonXYZ.YBasis * UNIT_CONVERSION;
                             rotationCenter = jsonXYZ.XBasis * jsonS_Trap.config.revolving_ratio * jsonS_Trap.Radius * UNIT_CONVERSION;
-                            angle = angle;
+                            //angle = angle;
 
                             shapeRepresentation.Items.Add(createRevolved(angle, radius, rotationAxis, rotationCenter, temp_location, temp_axis, temp_ref, S_trap_appearance));
 
@@ -263,11 +264,16 @@ namespace Scan2BimConnect.Utilities
         }
         public List<IIfcFlowFitting> createPipePTrap()
         {
-            jsonPipe pipe = null;
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMEP Error: Empty jmep");
             List<IIfcFlowFitting> ret = new List<IIfcFlowFitting>();
-            foreach (jsonP_Trap jsonP_Trap in jmep.P_Trap)
+            foreach (jsonP_Trap jsonP_Trap in jmep.P_Trap ?? throw new ArgumentNullException("jsonMep error: empty Ptraps"))
             {
-                pipe = pipes.Find(x => x.ID == jsonP_Trap.Pipe_Index);
+                List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
+                jsonPipe pipe = pipes.Find(x => x.ID == jsonP_Trap.Pipe_Index) ?? throw new ArgumentNullException("Couldn't find pipe with index: " + jsonP_Trap.Pipe_Index);
+
+                jsonP_Trap.Startpoint = jsonP_Trap.Startpoint ?? throw new ArgumentNullException("jsonP error: empty startpoint");
+                jsonP_Trap.Vertical_direction = jsonP_Trap.Vertical_direction ?? throw new ArgumentNullException("jsonP error: empty Vertical_direction");
+                jsonP_Trap.Span_direction = jsonP_Trap.Span_direction ?? throw new ArgumentNullException("jsonP error: empty Span_direction");
 
                 jsonXYZ locationJsonXYZ = jsonP_Trap.Startpoint;
                 jsonXYZ axisJsonXYZ = jsonP_Trap.Vertical_direction.normalized();
@@ -286,13 +292,11 @@ namespace Scan2BimConnect.Utilities
                 double revolving_cutratio = jsonP_Trap.config.revolving_ratio / Math.Tan(revolving_angle / 2);
 
                 double radius = jsonP_Trap.Radius * UNIT_CONVERSION;
-                jsonXYZ temp_location = null;
-                jsonXYZ temp_axis = null;
-                jsonXYZ temp_ref = null;
+                jsonXYZ temp_location, temp_axis, temp_ref, rotationAxis, rotationCenter;
+
                 double depth = 0.0;
                 double angle = 0.0;
-                jsonXYZ rotationAxis = null;
-                jsonXYZ rotationCenter = null;
+
 
                 KeyValuePair<BuildingComponent, Style> P_trap_appearance = appearance.First(p => p.Key == BuildingComponent.P_trap);
 
@@ -359,9 +363,11 @@ namespace Scan2BimConnect.Utilities
         }
         public List<IfcDuctSegment> createDucts()
         {
+            this.jm = jm ?? throw new ArgumentNullException("jsonM Error: Empty jm");
             List<IfcDuctSegment> ret = new List<IfcDuctSegment>();
-            foreach (jsonDuct jsonDuct in jm.duct)
+            foreach (jsonDuct jsonDuct in jm.duct ?? throw new ArgumentNullException("jsonM error: empty ducts"))
             {
+                jsonDuct.Baseprofile = jsonDuct.Baseprofile ?? throw new ArgumentNullException("jsonDuct error: empty baseprofile");
                 if (jsonDuct.Length == 0 || jsonDuct.Baseprofile[0].distanceTo(jsonDuct.Baseprofile[4]) == 0)
                 {
                     Console.WriteLine("ERROR: Creating Pipe but the pipe is too short: #" + jsonDuct.ID.ToString() + "\n");
@@ -741,6 +747,6 @@ namespace Scan2BimConnect.Utilities
                 });
                 setAppearance(extrudedAreaSolid, pair);
             });
-        } 
+        }
     }
 }

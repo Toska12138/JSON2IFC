@@ -22,13 +22,19 @@ namespace Scan2BimConnect.Utilities
             return ifcStore.Instances.New<IfcPropertySet>(IfcPSet =>
             {
                 IfcPSet.Name = pSet.name;
-                pSet.properties.ForEach(prop => IfcPSet.HasProperties.Add(ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                if (pSet.properties != null)
+                {
+                    pSet.properties.ForEach(prop => IfcPSet.HasProperties.Add(ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
                 {
                     singleValue.Name = prop.name;
+                    prop.type = prop.type ?? throw new ArgumentNullException("IfcPropertySingleValue error: Null Type");
+                    prop.value = prop.value ?? "<null>";
                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString(), true);
-                    singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.value });
+                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + (prop.type ?? "IfcText").ToString()) ?? new IfcText().GetType();
+                    singleValue.NominalValue = (IfcValue?)Activator.CreateInstance(t, new Object[] { prop.value }) ?? new IfcText(prop.value.ToString() + "--Type Error: auto-generated IfcText");
+
                 })));
+                }
             });
         }
         public static PropertySet ToObject(IfcPropertySet ifcPropertySet)
@@ -36,7 +42,7 @@ namespace Scan2BimConnect.Utilities
             return new PropertySet()
             {
                 id = ifcPropertySet.GlobalId,
-                name = ifcPropertySet.Name,
+                name = ifcPropertySet.Name ?? "<null>",
                 type = ifcPropertySet.GetType().Name,
                 originalSystemId = ifcPropertySet.GlobalId,
                 properties = ifcPropertySet.HasProperties.OfType<IIfcPropertySingleValue>().ToList().ConvertAll(e =>
@@ -45,7 +51,7 @@ namespace Scan2BimConnect.Utilities
                     {
                         name = e.Name,
                         type = e.GetType().Name,
-                        value = (e as IfcPropertySingleValue).NominalValue.ToString()
+                        value = e.NominalValue.ToString() ?? "<null>"
                     };
                 })
             };
@@ -55,7 +61,7 @@ namespace Scan2BimConnect.Utilities
             return new PropertySet()
             {
                 id = ifcPropertySet.GlobalId,
-                name = ifcPropertySet.Name,
+                name = ifcPropertySet.Name ?? "<null>",
                 type = ifcPropertySet.GetType().Name,
                 originalSystemId = ifcPropertySet.GlobalId,
                 properties = ifcPropertySet.HasProperties.OfType<IIfcPropertySingleValue>().ToList().ConvertAll(e =>
@@ -64,21 +70,21 @@ namespace Scan2BimConnect.Utilities
                     {
                         name = e.Name,
                         type = e.NominalValue.GetType().Name,
-                        value = e.NominalValue.ToString()
+                        value = e.NominalValue.ToString() ?? "<null>"
                     };
                 })
             };
         }
-       public static MetaObject ToObject(IfcProduct ifcProduct)
+        public static MetaObject ToObject(IfcProduct ifcProduct)
         {
-            var propertySetsToAdd = ifcProduct.IsDefinedBy.Where(r => r.RelatingPropertyDefinition is IfcPropertySet).ToList().ConvertAll(e => { return ToObject(e.RelatingPropertyDefinition as IIfcPropertySet); });
+            var propertySetsToAdd = ifcProduct.IsDefinedBy.Where(r => r.RelatingPropertyDefinition is IfcPropertySet).ToList().ConvertAll(e => { return ToObject(e.RelatingPropertyDefinition as IIfcPropertySet ?? throw new NullReferenceException("Failed to cast pSet: " + e.Name)); });
             return new MetaObject()
             {
                 id = ifcProduct.GlobalId,
-                name = ifcProduct.Name,
+                name = ifcProduct.Name ?? "<null>",
                 type = ifcProduct.GetType().Name,
                 propertySets = propertySetsToAdd,
-                propertySetIds = propertySetsToAdd.ConvertAll(e => e.id)
+                propertySetIds = propertySetsToAdd.ConvertAll(e => e.id ?? throw new ArgumentNullException("pSet null ids"))
             };
         }
     }

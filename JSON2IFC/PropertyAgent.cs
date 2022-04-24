@@ -20,31 +20,33 @@ namespace Scan2BimConnect.Utilities
         }
         public static Dictionary<string, List<PropertySet>> defaultProperties = new Dictionary<string, List<PropertySet>>
         {
-            { "IfcWallType", null },
-            { "IfcWall", null },
-            { "IfcColumnType", null },
-            { "IfcBeamType", null },
-            { "IfcWindowType", null },
-            { "IfcDoorType", null },
-            { "IfcSlabType", null}
+            { "IfcWallType", new List<PropertySet>() },
+            { "IfcWall", new List<PropertySet>() },
+            { "IfcColumnType", new List<PropertySet>() },
+            { "IfcBeamType", new List<PropertySet>() },
+            { "IfcWindowType", new List<PropertySet>() },
+            { "IfcDoorType", new List<PropertySet>() },
+            { "IfcSlabType", new List<PropertySet>()}
         };
         public IfcPropertySet generateSet(PropertySet propSet)
         {
             return ifcStore.Instances.New<IfcPropertySet>(propertySet =>
             {
                 propertySet.Name = propSet.name;
-                propertySet.HasProperties.AddRange(propSet.properties.ConvertAll(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
-                {
-                    singleValue.Name = prop.name;
-                    Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                    Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString(), true);
-                    singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { prop.value });
-                })));
+                if (propSet.properties != null) propertySet.HasProperties.AddRange(propSet.properties.ConvertAll(prop => ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                 {
+                     singleValue.Name = prop.name;
+                     prop.type = prop.type ?? throw new ArgumentNullException("IfcPropertySingleValue error: Null Type");
+                     prop.value = prop.value ?? "<null>";
+                     Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
+                     Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + prop.type.ToString()) ?? new IfcText().GetType();
+                     singleValue.NominalValue = (Activator.CreateInstance(t, new Object[] { prop.value }) as IfcValue) ?? new IfcText(prop.value + "--TypeError: IfcText auto-generated");
+                 })));
             });
         }
         public void defineProperties(IfcProduct ifcProduct, Dictionary<string, List<PropertySet>> generalname_n_propertySets)
         {
-            if(generalname_n_propertySets[ifcProduct.GetType().Name] != null)
+            if (generalname_n_propertySets[ifcProduct.GetType().Name] != null)
             {
                 generalname_n_propertySets[ifcProduct.GetType().Name].ConvertAll(props => generateSet(props)).ForEach(props =>
                 {
@@ -99,16 +101,16 @@ namespace Scan2BimConnect.Utilities
                 {
                     using (var txn = ifcStore.BeginTransaction("Defines Properties"))
                     {
-                        MetaModel metaModel = new DataReader().readMetaData(metaDataPath);
+                        MetaModel metaModel = new DataReader().readMetaData(metaDataPath) ?? throw new ArgumentNullException("Failed to load mataModel");
                         metaModel.metaObjects.ToList().ForEach(o =>
                         {
-                            if(o.type != "Model")
+                            if (o.type != "Model")
                             {
                                 IfcProduct ifcProduct = ifcStore.Instances.OfType<IfcProduct>().First(e => e.GlobalId == o.id);
-                                List<string> ids = o.propertySets.ConvertAll(pSet => pSet.originalSystemId);
+                                List<string?> ids = o.propertySets.ConvertAll(pSet => pSet.originalSystemId);
                                 foreach (IfcRelDefinesByProperties ifcRelDefinesByProperties in ifcProduct.IsDefinedBy)
                                 {
-                                    if (!ids.Contains((ifcRelDefinesByProperties.RelatingPropertyDefinition as IfcPropertySet).GlobalId))
+                                    if (!ids.Contains((ifcRelDefinesByProperties.RelatingPropertyDefinition as IfcPropertySet ?? throw new ArgumentNullException("Couldn't cast pSet")).GlobalId))
                                     {
                                         ifcRelDefinesByProperties.RelatedObjects.Remove(ifcProduct);
                                     }
@@ -128,13 +130,15 @@ namespace Scan2BimConnect.Utilities
                                             }
                                             elementToDelete.ForEach(e => ifcStore.Delete(e));
                                             ifcPropertySet.HasProperties.Clear();
-                                            pSet.properties.ForEach(p => ifcPropertySet.HasProperties.Add(ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
-                                            {
-                                                singleValue.Name = p.name;
-                                                Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
-                                                Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + p.type.ToString(), true);
-                                                singleValue.NominalValue = (IfcValue)Activator.CreateInstance(t, new Object[] { p.value });
-                                            })));
+                                            if (pSet.properties != null) pSet.properties.ForEach(p => ifcPropertySet.HasProperties.Add(ifcStore.Instances.New<IfcPropertySingleValue>(singleValue =>
+                                             {
+                                                 singleValue.Name = p.name;
+                                                 p.type = p.type ?? throw new ArgumentNullException("IfcPropertySingleValue error: Null Type");
+                                                 p.value = p.value ?? "<null>";
+                                                 Assembly xbimAssem = AppDomain.CurrentDomain.GetAssemblies().First(a => a.GetName().Name == "Xbim.Ifc4");
+                                                 Type t = xbimAssem.GetType("Xbim.Ifc4.MeasureResource." + p.type.ToString()) ?? new IfcText().GetType();
+                                                 singleValue.NominalValue = (Activator.CreateInstance(t, new Object[] { p.value }) as IfcValue) ?? new IfcText(p.value + "--TypeError: IfcText auto-generated");
+                                             })));
                                         }
                                         else
                                         {
@@ -156,7 +160,7 @@ namespace Scan2BimConnect.Utilities
                         if (e.RelatedObjects.Count == 0)
                         {
                             List<IfcPropertySingleValue> propToDelete = new List<IfcPropertySingleValue>();
-                            foreach (IfcPropertySingleValue ifcPropertySingleValue in (e.RelatingPropertyDefinition as IfcPropertySet).HasProperties)
+                            foreach (IfcPropertySingleValue ifcPropertySingleValue in (e.RelatingPropertyDefinition as IfcPropertySet ?? throw new ArgumentNullException("Failed to cast pSet")).HasProperties)
                             {
                                 propToDelete.Add(ifcPropertySingleValue);
                             }
@@ -173,17 +177,17 @@ namespace Scan2BimConnect.Utilities
     }
     public class Property
     {
-        public string name { get; set; }
-        public string type { get; set; }
-        public string value { get; set; }
+        public string? name { get; set; }
+        public string? type { get; set; }
+        public string? value { get; set; }
     }
     public class PropertySet
     {
-        public string id { get; set; }
-        public string name { get; set; }
-        public string type { get; set; }
-        public string originalSystemId { get; set; }
-        public List<Property> properties { get; set; }
+        public string? id { get; set; }
+        public string? name { get; set; }
+        public string? type { get; set; }
+        public string? originalSystemId { get; set; }
+        public List<Property>? properties { get; set; }
         public IfcPropertySet ToIfcPropertySet(IfcStore ifcStore)
         {
             return new PropertyAgent(ifcStore).generateSet(this);

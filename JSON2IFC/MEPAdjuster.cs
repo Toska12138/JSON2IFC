@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Scan2BimShared.Models.IfcEntities;
-using static Scan2BimConnect.Utilities.SJSONPlugin;
 
 namespace Scan2BimConnect.Utilities
 {
@@ -10,33 +9,32 @@ namespace Scan2BimConnect.Utilities
     {
         const double FITTING_RADIUS_RATIO = 1.5;
         const double PIPE_LENGTH_LIMIT = 0.01;
-        public jsonMEP jmep { get; }
-        public jsonM jm { get; }
-        List<jsonPipe> pipes { get; }
-
-        public MEPAdjuster(jsonMEP jmep)
+        public jsonMEP? jmep { get; set; }
+        public jsonM? jm { get; set; }
+        public MEPAdjuster(jsonMEP? jmep, jsonM? jm)
         {
             this.jmep = jmep;
-            this.pipes = jmep.pipe.ToList();
-        }
-        public MEPAdjuster(jsonM jm)
-        {
             this.jm = jm;
         }
         public void adjustPipeElbow()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jmep error: empty jmep");
             if (jmep.Elbow_Pipe_Junction != null)
             {
-                jsonPipe pipe1 = null, pipe2 = null;
-                jsonXYZ center = null, shifting_dir, p1_dir, p2_dir;
-                List<jsonXYZ> pipe1Points = null, pipe2Points = null;
+                jsonXYZ center, shifting_dir, p1_dir, p2_dir;
+                List<jsonXYZ> pipe1Points, pipe2Points = new List<jsonXYZ>();
                 double average_radius, angle, shifting;
+                List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
                 foreach (jsonFitting jsonFitting in jmep.Elbow_Pipe_Junction)
                 {
-                    pipe1 = pipes.Find(x => x.ID.Equals(jsonFitting.pipe_index_1));
-                    pipe2 = pipes.Find(x => x.ID.Equals(jsonFitting.pipe_index_2));
+                    jsonPipe pipe1 = pipes.Find(x => x.ID.Equals(jsonFitting.pipe_index_1)) ?? throw new ArgumentNullException("Couldn't find pipe with index: " + jsonFitting.pipe_index_1);
+                    jsonPipe pipe2 = pipes.Find(x => x.ID.Equals(jsonFitting.pipe_index_2)) ?? throw new ArgumentNullException("Couldn't find pipe with index: " + jsonFitting.pipe_index_2);
                     if (pipe1 != null && pipe2 != null && pipe1.length != 0 && pipe2.length != 0)
                     {
+                        pipe1.startPoint = pipe1.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                        pipe1.endPoint = pipe1.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+                        pipe2.startPoint = pipe2.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                        pipe2.endPoint = pipe2.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
 
                         pipe1Points = new List<jsonXYZ>() { pipe1.startPoint, pipe1.endPoint };
                         pipe2Points = new List<jsonXYZ>() { pipe2.startPoint, pipe2.endPoint };
@@ -60,7 +58,7 @@ namespace Scan2BimConnect.Utilities
                         p2_dir = pipe2.direction;
 
                         shifting_dir = (p1_dir + p2_dir).normalized();
-                        average_radius = (pipe1.radius + pipe2.radius) / 2;
+                        average_radius = (pipe1.radius + pipe2.radius) / 2 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
                         center = (pipe1.startPoint + pipe2.startPoint) / 2;
                         angle = pipe1.direction.angleTo(pipe2.direction);
                         shifting = Math.Min(Math.Min(pipe2.length * (1 - PIPE_LENGTH_LIMIT), pipe1.length * (1 - PIPE_LENGTH_LIMIT)), average_radius * FITTING_RADIUS_RATIO);
@@ -87,11 +85,13 @@ namespace Scan2BimConnect.Utilities
         }
         public void adjustPipeTee()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jsonMep error: empty jsonMep");
+            List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
             if (jmep.T_Pipe_Junction != null)
             {
-                jsonPipe pipe1 = null, pipe2 = null, pipe3 = null;
-                List<jsonXYZ> pipe1Points = null, pipe2Points = null, pipe3Points = null;
-                jsonXYZ p1_dir = null, p2_dir = null, p3_dir = null, center = null;
+                jsonPipe? pipe1 = null, pipe2 = null, pipe3 = null;
+                List<jsonXYZ>? pipe1Points = null, pipe2Points = null, pipe3Points = null;
+                jsonXYZ? p1_dir = null, p2_dir = null, p3_dir = null, center = null;
                 double shifting = Double.MaxValue, average_radius;
                 foreach (jsonTee jsonTee in jmep.T_Pipe_Junction)
                 {
@@ -102,6 +102,12 @@ namespace Scan2BimConnect.Utilities
                     {
                         if (pipe1.ID != pipe2.ID)
                         {
+                            pipe1.startPoint = pipe1.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe1.endPoint = pipe1.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+                            pipe2.startPoint = pipe2.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe2.endPoint = pipe2.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+                            pipe3.startPoint = pipe3.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe3.endPoint = pipe3.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
                             pipe1Points = new List<jsonXYZ>() { pipe1.startPoint, pipe1.endPoint };
                             pipe2Points = new List<jsonXYZ>() { pipe2.startPoint, pipe2.endPoint };
                             pipe3Points = new List<jsonXYZ>() { pipe3.startPoint, pipe3.endPoint };
@@ -134,7 +140,7 @@ namespace Scan2BimConnect.Utilities
                             p2_dir = pipe2.direction;
                             p3_dir = pipe3.direction;
 
-                            average_radius = (pipe1.radius + pipe2.radius + pipe3.radius) / 3;
+                            average_radius = (pipe1.radius + pipe2.radius + pipe3.radius) / 3 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
 
                             center = (pipe1.startPoint + pipe2.startPoint) / 2;
 
@@ -148,13 +154,20 @@ namespace Scan2BimConnect.Utilities
 
                             jsonTee.center = center;
 
-                            jsonTee.Pt1 = pipe1.startPoint;
-                            jsonTee.Pt2 = pipe2.startPoint;
-                            jsonTee.Pt3 = pipe3.startPoint;
+                            jsonTee.segments = new List<Tuple<jsonXYZ?, double?>?>();
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(pipe1.startPoint, pipe1.radius));
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(pipe2.startPoint, pipe2.radius));
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(pipe3.startPoint, pipe3.radius));
                             jsonTee.isValid = true;
                         }
                         else if (jsonTee.center != null)
                         {
+                            pipe1.startPoint = pipe1.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe1.endPoint = pipe1.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+                            pipe2.startPoint = pipe2.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe2.endPoint = pipe2.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+                            pipe3.startPoint = pipe3.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                            pipe3.endPoint = pipe3.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
                             pipe1Points = new List<jsonXYZ>() { pipe1.startPoint, pipe1.endPoint };
                             pipe2Points = new List<jsonXYZ>() { pipe2.startPoint, pipe2.endPoint };
                             pipe3Points = new List<jsonXYZ>() { pipe3.startPoint, pipe3.endPoint };
@@ -172,17 +185,18 @@ namespace Scan2BimConnect.Utilities
                             p2_dir = pipe2.direction;
                             p3_dir = pipe3.direction;
 
-                            average_radius = (pipe1.radius + pipe2.radius + pipe3.radius) / 3;
+                            average_radius = (pipe1.radius + pipe2.radius + pipe3.radius) / 3 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
 
                             shifting = Math.Min(pipe1.startPoint.distanceTo(jsonTee.center) * (1 - PIPE_LENGTH_LIMIT), average_radius * FITTING_RADIUS_RATIO);
                             shifting = Math.Min(pipe1.endPoint.distanceTo(jsonTee.center) * (1 - PIPE_LENGTH_LIMIT), shifting);
                             shifting = Math.Min(pipe3.length * (1 - PIPE_LENGTH_LIMIT), shifting);
 
                             pipe3.startPoint += pipe3.direction * shifting;
-                            jsonTee.Pt1 = jsonTee.center + p1_dir * shifting;
-                            jsonTee.Pt2 = jsonTee.center - p1_dir * shifting;
+                            jsonTee.segments = new List<Tuple<jsonXYZ?, double?>?>();
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(jsonTee.center + p1_dir * shifting, pipe1.radius));
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(jsonTee.center - p1_dir * shifting, pipe2.radius));
+                            jsonTee.segments.Add(new Tuple<jsonXYZ?, double?>(pipe3.startPoint, pipe3.radius));
 
-                            jsonTee.Pt3 = pipe3.startPoint;
                             jsonTee.isValid = true;
                         }
                     }
@@ -193,26 +207,32 @@ namespace Scan2BimConnect.Utilities
         }
         public void adjustPipeSTrap()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jmep error: empty jmep");
+            List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
             if (jmep.S_Trap != null)
             {
-                jsonPipe pipe = null;
-                jsonXYZ center = null, S_pt, shifting_dir, p_dir;
-                List<jsonXYZ> pipePoints = null;
+                jsonXYZ center, S_pt, shifting_dir, p_dir;
+                List<jsonXYZ> pipePoints;
                 double average_radius, angle, shifting;
                 foreach (jsonS_Trap jsonS_Trap in jmep.S_Trap)
                 {
-                    pipe = pipes.Find(x => x.ID.Equals(jsonS_Trap.Pipe_Index));
+                    jsonS_Trap.Startpoint = jsonS_Trap.Startpoint ?? throw new ArgumentNullException("jsonStrap error: empty startpoint");
+                    jsonS_Trap.Vertical_direction = jsonS_Trap.Vertical_direction ?? throw new ArgumentNullException("jsonStrap error: empty Vertical_direction");
+                    jsonPipe pipe = pipes.Find(x => x.ID.Equals(jsonS_Trap.Pipe_Index)) ?? throw new ArgumentNullException("Couldn't find pipe with index: " + jsonS_Trap.Pipe_Index);
                     if (pipe != null && pipe.length != 0 && jsonS_Trap.Joint_Type == "end")
                     {
+                        pipe.startPoint = pipe.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                        pipe.endPoint = pipe.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
+
                         S_pt = jsonS_Trap.Startpoint;
                         pipePoints = new List<jsonXYZ>() { pipe.startPoint, pipe.endPoint };
-                        double minDis = Double.MaxValue;
+                        // double minDis = Double.MaxValue;
                         pipe.startPoint = pipePoints[0].distanceTo(S_pt) < pipePoints[1].distanceTo(S_pt) ? pipePoints[0] : pipePoints[1];
                         pipe.endPoint = pipePoints.Find(x => !x.Equals(pipe.startPoint));
                         p_dir = pipe.direction;
 
                         shifting_dir = (p_dir.normalized() + jsonS_Trap.Vertical_direction.normalized()).normalized();
-                        average_radius = (pipe.radius + jsonS_Trap.Radius) / 2;
+                        average_radius = (pipe.radius + jsonS_Trap.Radius) / 2 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
                         center = (pipe.startPoint + S_pt) / 2;
                         angle = pipe.direction.angleTo(jsonS_Trap.Vertical_direction);
                         shifting = Math.Min(Math.Min(pipe.length * (1 - PIPE_LENGTH_LIMIT), jsonS_Trap.Radius * jsonS_Trap.config.vertical_ratio * (1 - PIPE_LENGTH_LIMIT)), average_radius * FITTING_RADIUS_RATIO);
@@ -233,17 +253,19 @@ namespace Scan2BimConnect.Utilities
                         jsonS_Trap.connecting_elbow.location = pipe.startPoint;
                         jsonS_Trap.connecting_elbow.isValid = true;
 
-                        jmep.Elbow_Pipe_Junction = jmep.Elbow_Pipe_Junction.Concat(new jsonFitting[] { jsonS_Trap.connecting_elbow }).ToArray();
+                        jmep.Elbow_Pipe_Junction = (jmep.Elbow_Pipe_Junction ?? new jsonFitting[] { }).Concat(new jsonFitting[] { jsonS_Trap.connecting_elbow }).ToArray();
                     }
                     else if (pipe != null && pipe.length != 0 && jsonS_Trap.Joint_Type == "mid")
                     {
-                        jsonXYZ trap_dir = null;
+                        jsonXYZ trap_dir;
+                        pipe.startPoint = pipe.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                        pipe.endPoint = pipe.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
                         center = jsonS_Trap.Startpoint.projectTo(pipe.startPoint, pipe.endPoint);
                         pipePoints = new List<jsonXYZ>() { pipe.startPoint, pipe.endPoint };
                         p_dir = pipe.direction;
                         trap_dir = jsonS_Trap.Vertical_direction.normalized();
 
-                        average_radius = (2 * pipe.radius + jsonS_Trap.Radius) / 3;
+                        average_radius = (2 * pipe.radius + jsonS_Trap.Radius) / 3 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
 
                         shifting = Math.Min(pipe.startPoint.distanceTo(center) * (1 - PIPE_LENGTH_LIMIT), average_radius * FITTING_RADIUS_RATIO);
                         shifting = Math.Min(pipe.endPoint.distanceTo(center) * (1 - PIPE_LENGTH_LIMIT), shifting);
@@ -253,13 +275,14 @@ namespace Scan2BimConnect.Utilities
                         jsonS_Trap.connecting_tee = new jsonTee();
 
                         jsonS_Trap.connecting_tee.center = center;
-                        jsonS_Trap.connecting_tee.Pt1 = center + p_dir * shifting;
-                        jsonS_Trap.connecting_tee.Pt2 = center - p_dir * shifting;
+                        jsonS_Trap.connecting_tee.segments = new List<Tuple<jsonXYZ?, double?>?>();
+                        jsonS_Trap.connecting_tee.segments.Add(new Tuple<jsonXYZ?, double?>(center + p_dir * shifting, pipe.radius));
+                        jsonS_Trap.connecting_tee.segments.Add(new Tuple<jsonXYZ?, double?>(center - p_dir * shifting, pipe.radius));
+                        jsonS_Trap.connecting_tee.segments.Add(new Tuple<jsonXYZ?, double?>(jsonS_Trap.Startpoint, pipe.radius));
 
-                        jsonS_Trap.connecting_tee.Pt3 = jsonS_Trap.Startpoint;
                         jsonS_Trap.connecting_tee.isValid = true;
 
-                        jmep.T_Pipe_Junction = jmep.T_Pipe_Junction.Concat(new jsonTee[] { jsonS_Trap.connecting_tee }).ToArray();
+                        jmep.T_Pipe_Junction = (jmep.T_Pipe_Junction ?? new jsonTee[] { }).Concat(new jsonTee[] { jsonS_Trap.connecting_tee }).ToArray();
 
                     }
                     else if (pipe == null) Console.WriteLine("ERROR: Creating S trap but cannot find pipe, index: " + "#" + jsonS_Trap.Pipe_Index.ToString());
@@ -269,26 +292,32 @@ namespace Scan2BimConnect.Utilities
         }
         public void adjsutPipeTTrap()
         {
+            this.jmep = jmep ?? throw new ArgumentNullException("jmep error: empty jmep");
+            List<jsonPipe> pipes = (jmep.pipe ?? throw new ArgumentNullException("jsonMep error: empty pipes")).ToList();
             if (jmep.P_Trap != null)
             {
-                jsonPipe pipe = null;
-                jsonXYZ center = null, P_pt, shifting_dir, p_dir;
-                List<jsonXYZ> pipePoints = null;
+                jsonXYZ center, P_pt, shifting_dir, p_dir;
+                List<jsonXYZ> pipePoints;
                 double average_radius, angle, shifting;
                 foreach (jsonP_Trap jsonP_Trap in jmep.P_Trap)
                 {
-                    pipe = pipes.Find(x => x.ID.Equals(jsonP_Trap.Pipe_Index));
+                    jsonP_Trap.Startpoint = jsonP_Trap.Startpoint ?? throw new ArgumentNullException("jsonStrap error: empty startpoint");
+                    jsonP_Trap.Span_direction = jsonP_Trap.Span_direction ?? throw new ArgumentNullException("jsonStrap error: empty Span_direction");
+                    jsonP_Trap.Vertical_direction = jsonP_Trap.Vertical_direction ?? throw new ArgumentNullException("jsonStrap error: empty Vertical_direction");
+                    jsonPipe pipe = pipes.Find(x => x.ID.Equals(jsonP_Trap.Pipe_Index)) ?? throw new ArgumentNullException("Couldn't find pipe with index: " + jsonP_Trap.Pipe_Index);
                     if (pipe != null && pipe.length != 0)
                     {
+                        pipe.startPoint = pipe.startPoint ?? throw new ArgumentNullException("jsonPipe error: empty startPoint");
+                        pipe.endPoint = pipe.endPoint ?? throw new ArgumentNullException("jsonPipe error: empty endPoint");
                         P_pt = jsonP_Trap.Startpoint;
                         pipePoints = new List<jsonXYZ>() { pipe.startPoint, pipe.endPoint };
-                        double minDis = Double.MaxValue;
+                        // double minDis = Double.MaxValue;
                         pipe.startPoint = pipePoints[0].distanceTo(P_pt) < pipePoints[1].distanceTo(P_pt) ? pipePoints[0] : pipePoints[1];
                         pipe.endPoint = pipePoints.Find(x => !x.Equals(pipe.startPoint));
                         p_dir = pipe.direction;
 
                         shifting_dir = (p_dir.normalized() + jsonP_Trap.Span_direction.normalized()).normalized();
-                        average_radius = (pipe.radius + jsonP_Trap.Radius) / 2;
+                        average_radius = (pipe.radius + jsonP_Trap.Radius) / 2 ?? throw new ArgumentNullException("jsonPipe error: empty radius");
                         center = (pipe.startPoint + P_pt) / 2;
                         angle = pipe.direction.angleTo(jsonP_Trap.Span_direction);
                         shifting = Math.Min(Math.Min(pipe.length * (1 - PIPE_LENGTH_LIMIT), jsonP_Trap.Radius * jsonP_Trap.config.vertical_ratio * (1 - PIPE_LENGTH_LIMIT)), average_radius * FITTING_RADIUS_RATIO);
@@ -309,7 +338,7 @@ namespace Scan2BimConnect.Utilities
                         jsonP_Trap.connecting_elbow.location = pipe.startPoint;
                         jsonP_Trap.connecting_elbow.isValid = true;
 
-                        jmep.Elbow_Pipe_Junction = jmep.Elbow_Pipe_Junction.Concat(new jsonFitting[] { jsonP_Trap.connecting_elbow }).ToArray();
+                        jmep.Elbow_Pipe_Junction = (jmep.Elbow_Pipe_Junction ?? new jsonFitting[] { }).Concat(new jsonFitting[] { jsonP_Trap.connecting_elbow }).ToArray();
                     }
                     else if (pipe == null) Console.WriteLine("ERROR: Creating P trap but cannot find pipe, index: " + "#" + jsonP_Trap.Pipe_Index.ToString());
                     else if (pipe.length == 0) Console.WriteLine("ERROR: Creating P trap but the pipe is too short, index: " + "#" + jsonP_Trap.Pipe_Index.ToString());

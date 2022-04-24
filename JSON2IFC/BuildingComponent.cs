@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Scan2BimShared.StaticData.IfcEnums
+﻿namespace Scan2BimShared.StaticData.IfcEnums
 {
-    enum BuildingComponent
+    public enum BuildingComponent
     {
         Column = 0,
         Beam = 1,
@@ -20,5 +14,15 @@ namespace Scan2BimShared.StaticData.IfcEnums
         S_trap = 9,
         P_trap = 10,
         Duct = 11
+    }
+    
+    public enum Material
+    {
+        Concrete = 0,
+        Glass = 1,
+        Wood = 2,
+        Air = 3,
+        PVC = 4,
+        Steel = 5
     }
 }
